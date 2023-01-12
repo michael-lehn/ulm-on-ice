@@ -1,8 +1,5 @@
 module top(
     input CLK,
-    input BTN1,
-    output LED1,
-    output LED2,
     output TX,
     );
 
@@ -21,7 +18,7 @@ localparam
     RUN_FETCH   = 2'b01,
     RUN_TX_START  = 2'b10,
     RUN_TX_WAIT = 2'b11;
-reg [1:0] run_state = RUN_FETCH;
+reg [1:0] run_state = RUN_TX_WAIT;
 
 // mem_addr addresses single bytes in SPRAM. If mem_write == 1 the byte in
 // mem_data_in will be stored in the next cycle. If mem_write == 0 the byte
@@ -74,7 +71,6 @@ always @ (posedge CLK) begin
 		begin
 		    if (mem_addr[1:0] == 2'b11) begin
 			init_done <= 1'b1;
-			mem_write <= 1'b0;
 		    end
 		    else begin
 			mem_addr <= mem_addr + 1;
@@ -86,12 +82,20 @@ always @ (posedge CLK) begin
     else begin
 	// Data already loaded to SPRAM
 	case (run_state)
-	    RUN_FETCH:
-		// Fetch one byte from next address. Wrap around when previous
-		// address was 3.
+	    RUN_TX_WAIT:
+		// Wait until a previous byte transmission is completed.
+		// Also advance the address. If the address is 3 wrap to 0.
 		begin
+		    tx_start <= 1'b0;
+		    if (~tx_busy) begin
+			run_state <= RUN_FETCH;
+		    end
 		    mem_write <= 1'b0;
 		    mem_addr <= (mem_addr + 1) % 4;
+		end
+	    RUN_FETCH:
+		// Idle one cycle so that fetching a byte is done
+		begin
 		    run_state <= RUN_TX_START;
 		end
 	    RUN_TX_START:
@@ -101,14 +105,6 @@ always @ (posedge CLK) begin
 		    tx_start <= 1'b1;
 		    run_state <= RUN_TX_WAIT;
 		end 
-	    RUN_TX_WAIT:
-		// Wait until transmission is completed.
-		begin
-		    tx_start <= 1'b0;
-		    if (~tx_busy) begin
-			run_state <= RUN_FETCH;
-		    end
-		end
 	endcase
     end
 end
