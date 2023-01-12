@@ -50,8 +50,8 @@ always @(posedge clk) begin
     end
     else begin
 	ram_we <= 4'b0000;
-	data_out_reg[7:0] <= ~ram_byte_sel[0] ? ram_data_out[15:8]
-					      : ram_data_out[7:0];
+	data_out_reg[7:0] <= ~ram_byte_sel ? ram_data_out[15:8]
+					   : ram_data_out[7:0];
     end
 end
 
