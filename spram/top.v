@@ -26,7 +26,7 @@ reg [1:0] run_state = RUN_TX_WAIT;
 reg [14:0] mem_addr = 0;
 reg mem_write = 1'b0;
 reg [7:0] mem_data_in;
-reg [7:0] mem_data_out;
+wire [7:0] mem_data_out;
 
 mem mem_inst(
     .clk(CLK),
