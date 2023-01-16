@@ -1,11 +1,10 @@
 // For addressing single bytes.
 module mem(
-    input wire clk,
-    input wire [14:0] addr,
-    input wire write,
-    input wire [7:0] data_in,
-    output [7:0] data_out
-    );
+    input logic clk,
+    input logic [14:0] addr,
+    input logic write,
+    input logic [7:0] data_in,
+    output logic [7:0] data_out);
 
 // Physically memory is organized in words (of 16 bits). 
 //
@@ -21,17 +20,11 @@ module mem(
 //   [[Byte 0] [Byte 1]] [[Byte 2] [ Byte 3]] ...
 //
 
-wire [13:0] spram_addr = addr[14:1];
-wire spram_byte_sel = addr[0];
-wire [3:0] spram_we = write ? spram_byte_sel ? 4'b1100
-                                             : 4'b0011
-                            : 4'b0000;
-wire [15:0] spram_data_in = ~addr[0] ? {8'd0, data_in}
-                                   : {data_in, 8'd0};
-
-wire [15:0] spram_data_out;
-assign data_out = spram_byte_sel ? spram_data_out[15:8]
-                                 : spram_data_out[7:0];
+logic [13:0] spram_addr;
+logic spram_byte_sel;
+logic [3:0] spram_we;
+logic [15:0] spram_data_in;
+logic [15:0] spram_data_out;
 
 spram spram_inst(
     .clk(clk),
@@ -40,5 +33,17 @@ spram spram_inst(
     .data_in(spram_data_in),
     .data_out(spram_data_out)
 );
+
+always_comb begin
+    spram_addr[13:0] = addr[14:1];
+    spram_byte_sel = addr[0];
+    spram_we = write ? spram_byte_sel ? 4'b1100
+                                      : 4'b0011
+                     : 4'b0000;
+    spram_data_in = ~addr[0] ? {8'd0, data_in}
+                             : {data_in, 8'd0};
+    data_out = spram_byte_sel ? spram_data_out[15:8]
+                              : spram_data_out[7:0];
+end
 
 endmodule

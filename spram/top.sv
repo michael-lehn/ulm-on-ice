@@ -5,23 +5,25 @@ module top(
 
 // Indicated whether we are initializing the memory (init_done == 0) or
 // printing the memory content (init_done == 1)
-reg init_done = 1'b0;
-reg [14:0] init_mem_addr = 0;
+logic init_done = 1'b0;
+logic [14:0] init_mem_addr = 0;
 
 // States when memory content gets printed
-localparam
-    RUN_TX_WAIT = 2'b00,
-    RUN_FETCH   = 2'b01,
-    RUN_TX_START  = 2'b10;
-reg [1:0] run_state = RUN_TX_WAIT;
+typedef enum logic [1:0] {
+     RUN_TX_WAIT,
+     RUN_FETCH,
+     RUN_TX_START
+} run_state_t /*verilator public*/;
+
+run_state_t run_state = RUN_TX_WAIT;
 
 // mem_addr addresses single bytes in SPRAM. If mem_write == 1 the byte in
 // mem_data_in will be stored in the next cycle. If mem_write == 0 the byte
 // from address mem_addr will be fetched to mem_data_out in the next cycle.
-reg [14:0] mem_addr = 0;
-reg mem_write = 1'b0;
-reg [7:0] mem_data_in;
-wire [7:0] mem_data_out;
+logic [14:0] mem_addr = 0;
+logic mem_write = 1'b0;
+logic [7:0] mem_data_in;
+logic [7:0] mem_data_out;
 
 mem mem_inst(
     .clk(CLK),
@@ -33,9 +35,9 @@ mem mem_inst(
 
 // From the "pll uart" example. When tx_start is 1 the byte in tx_char gets
 // transmitted. tx_busy == 1 indicates that we are currently sending.
-reg tx_start = 1'b0;
-reg tx_busy;
-reg [7:0] tx_char = 0;
+logic tx_start = 1'b0;
+logic tx_busy;
+logic [7:0] tx_char = 0;
 
 localparam clk_freq = 12_000_000; // 12MHz
 localparam baud = 9600;
@@ -91,7 +93,9 @@ always @ (posedge CLK) begin
 		    tx_char <= mem_data_out;
 		    tx_start <= 1'b1;
 		    run_state <= RUN_TX_WAIT;
-		end 
+		end
+	    default:
+		;
 	endcase
     end
 end

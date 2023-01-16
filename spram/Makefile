@@ -1,5 +1,5 @@
 vProject :=  top
-vSource := $(wildcard *.v)
+vSource := $(wildcard *.v) $(wildcard *.sv)
 
 vProject.log := $(vProject).log
 vProject.json := $(vProject).json
