@@ -1,23 +1,18 @@
 module top(
     input CLK,
-    output TX,
+    output TX
     );
 
 // Indicated whether we are initializing the memory (init_done == 0) or
 // printing the memory content (init_done == 1)
 reg init_done = 1'b0;
-
-// States when memory gets initialized
-localparam
-    INIT_SET = 1'b0,
-    INIT_INC = 1'b1;
-reg init_state = INIT_SET;
+reg [14:0] init_mem_addr = 0;
 
 // States when memory content gets printed
 localparam
+    RUN_TX_WAIT = 2'b00,
     RUN_FETCH   = 2'b01,
-    RUN_TX_START  = 2'b10,
-    RUN_TX_WAIT = 2'b11;
+    RUN_TX_START  = 2'b10;
 reg [1:0] run_state = RUN_TX_WAIT;
 
 // mem_addr addresses single bytes in SPRAM. If mem_write == 1 the byte in
@@ -33,7 +28,7 @@ mem mem_inst(
     .addr(mem_addr),
     .write(mem_write),
     .data_in(mem_data_in),
-    .data_out(mem_data_out),
+    .data_out(mem_data_out)
 );
 
 // From the "pll uart" example. When tx_start is 1 the byte in tx_char gets
@@ -53,31 +48,23 @@ uart_tx #(clk_freq, baud) uart_tx_inst(
     .tx_busy(tx_busy)
 );
 
+// intensionally ignore bits in val15'[14:8]
+function [7:0] trunc_15_to_8(input [14:0] val15);
+    trunc_15_to_8 = val15[7:0];
+endfunction
+
 
 always @ (posedge CLK) begin
     if (~init_done) begin
 	// Write some bytes to SPRAM
-	case (init_state)
-	    INIT_SET:
-		// Store 'A', .., 'D' at addresses 0, .., 3 respectively.
-		begin
-		    mem_write <= 1'b1;
-		    mem_data_in[7:0] <= "A" + mem_addr;
-		    init_state <= INIT_INC;
-		end
-	    INIT_INC:
-	        // Increment address unless the address was 3. In the later
-		// case initialization is done.
-		begin
-		    if (mem_addr[1:0] == 2'b11) begin
-			init_done <= 1'b1;
-		    end
-		    else begin
-			mem_addr <= mem_addr + 1;
-		    end
-		    init_state <= INIT_SET;
-		end
-	endcase
+	// - Store 'A', .., 'D' at addresses 0, .., 3 respectively.
+	mem_write <= 1'b1;
+	mem_data_in[7:0] <= trunc_15_to_8(15'd65 + init_mem_addr);
+	// Increment address. If address 3 was initialized we are done.
+	mem_addr <= init_mem_addr;
+	init_mem_addr <= init_mem_addr + 1;
+	if (init_mem_addr[1:0] == 2'b11)
+	    init_done <= 1'b1;
     end
     else begin
 	// Data already loaded to SPRAM

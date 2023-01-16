@@ -4,7 +4,7 @@ module mem(
     input wire [14:0] addr,
     input wire write,
     input wire [7:0] data_in,
-    output [7:0] data_out,
+    output [7:0] data_out
     );
 
 // Physically memory is organized in words (of 16 bits). 
@@ -21,38 +21,24 @@ module mem(
 //   [[Byte 0] [Byte 1]] [[Byte 2] [ Byte 3]] ...
 //
 
-reg [13:0] ram_addr;
-reg ram_byte_sel;
-reg [3:0] ram_we;
-reg [15:0] ram_data_in;
-wire [15:0] ram_data_out;
+wire [13:0] spram_addr = addr[14:1];
+wire spram_byte_sel = addr[0];
+wire [3:0] spram_we = write ? spram_byte_sel ? 4'b1100
+                                             : 4'b0011
+                            : 4'b0000;
+wire [15:0] spram_data_in = ~addr[0] ? {8'd0, data_in}
+                                   : {data_in, 8'd0};
 
-reg [7:0] data_out_reg;
-assign data_out = data_out_reg;
+wire [15:0] spram_data_out;
+assign data_out = spram_byte_sel ? spram_data_out[15:8]
+                                 : spram_data_out[7:0];
 
 spram spram_inst(
-    clk,
-    ram_we,
-    ram_addr,
-    ram_data_in,
-    ram_data_out,
+    .clk(clk),
+    .we(spram_we),
+    .addr(spram_addr),
+    .data_in(spram_data_in),
+    .data_out(spram_data_out)
 );
-
-always @(posedge clk) begin
-    ram_addr[13:0] <= addr[14:1];
-    ram_byte_sel <= addr[0];
-    if (write) begin
-	ram_we <= ~addr[0] ? 4'b1100 : 4'b0011;
-	if (~addr[0])
-	    ram_data_in[15:8] <= data_in[7:0];
-	else
-	    ram_data_in[7:0] <= data_in[7:0];
-    end
-    else begin
-	ram_we <= 4'b0000;
-	data_out_reg[7:0] <= ~ram_byte_sel ? ram_data_out[15:8]
-					   : ram_data_out[7:0];
-    end
-end
 
 endmodule

@@ -18,7 +18,7 @@ The output is supposed to be a sequence of bytes that are fetched from SPRAM.
 Unfortunately I am still having a problem here and need some help to fix it
 (see below).
 
-## What it should do
+## What it does
 
 In an initialization phase it stores the ASCII value of `A` at address 0, `B`
 at address 1, `C` at address 2, `D` at address 3.
@@ -29,24 +29,13 @@ at address 0, then the character at address 1, etc. After it has printed `D`
 
 So the expected output is `ABCDABCDABCDABCDABCDABCDABCDABC...`
 
-## Help needed: What it actually does
-
-So the actual output is `�BCDABCDABCDABCDABCDABCDABCDABC...`. In my
-understanding it means that the four bytes are correctly stored in memory. But
-fetching the very first byte fails and therefor some trash gets printed.
-
 ## How it works
 
 The code realizes a finite state machine. For now just some ASCII code so that
 comments in the code make more sense and the overall logic becomes clear:
 
 ```
-        +-----------------------+
-        |                       |
-        v                       |
- -> [[Init Set]] -> [Init Inc] -+
-                        |
-        +---------------+
+ -> [[Inititialize some memory cells]]
         |
         v
     [Run Tx Wait] -> [Run Fetch] -> [Run Tx Start] -+
@@ -55,16 +44,8 @@ comments in the code make more sense and the overall logic becomes clear:
         +-------------------------------------------+
 ```
 
-States `[[Init Set]]` and `[Init Inc]` are relevant for initializing bytes in
-SPRAM:
-
-- In `[[Init Set]]` storing a byte at an address is triggered. At startup the
-  address is 0. The bytes stored is 'A' + address. So at address 0 we store
-  'A', at address 1 we store 'B', etc.
-
-- In `[Init Inc]` the store operation is completed. Unless the current address
-  equals 3 it gets incremented. If the address is 3 the initialization is
-  complete and the next state will be `[Run Tx Wait]`.
+In state `[[Inititialize some memory cells]]` characters 'A', 'B', 'C' and 'D'
+are stored at addresses 0, 1, 2, and 3 respectively.
 
 States `[Run Tx Wait]`, `[Run Fetch]` and `[Run Tx Start]` are used to print
 the stored bytes will be printed. This cycle never ends. So the FSM is not
