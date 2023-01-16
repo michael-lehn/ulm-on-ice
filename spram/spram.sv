@@ -4,11 +4,11 @@ module spram #(
     localparam DEPTH=16384,  // fixed depth: 16K 
     localparam ADDRW=$clog2(DEPTH)
     ) (
-    input wire clk,
-    input wire [3:0] we,
-    input wire [ADDRW-1:0] addr,
-    input wire [WIDTH-1:0] data_in,
-    output     [WIDTH-1:0] data_out
+    input logic clk,
+    input logic [3:0] we,
+    input logic [ADDRW-1:0] addr,
+    input logic [WIDTH-1:0] data_in,
+    output logic [WIDTH-1:0] data_out
     );
 
     SB_SPRAM256KA spram_inst (
