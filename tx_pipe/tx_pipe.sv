@@ -11,11 +11,23 @@ module tx_pipe #(
     output logic tx,
     output logic error
 );
-
+    // check if a character can be popped from fifo
     logic empty;
     logic pop_front;
-    logic [WIDTH-1:0] data_out;
 
+    always_ff @ (posedge clk) begin
+	pop_front <= 0;
+	if (!rst) begin
+	    pop_front <= 0;
+
+	    if (tx_done) begin
+		pop_front <= !empty && !pop_front;
+	    end
+	end
+    end
+
+    // send popped character to tx
+    logic [WIDTH-1:0] data_out;
     logic [WIDTH-1:0] tx_data_in;
     logic tx_busy;
     logic tx_start;
@@ -24,18 +36,10 @@ module tx_pipe #(
     assign tx_done = !tx_start && !tx_busy;
 
     always_ff @ (posedge clk) begin
-	if (rst) begin
-	    pop_front <= 0;
-	    tx_start <= 0;
-	end
-	else begin
-	    tx_start <= 0;
-	    pop_front <= 0;
-
-	    if (tx_done) begin
-		pop_front <= !empty && !pop_front;
-	    end
+	tx_start <= 0;
+	if (!rst) begin
 	    if (pop_front) begin
+		// print character
 		tx_data_in <= data_out;
 		tx_start <= 1;
 	    end
