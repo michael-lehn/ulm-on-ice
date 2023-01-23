@@ -1,6 +1,6 @@
 MODULE=test
-SV_FILES = $(wildcard *.sv)
-INCLUDE_PATH += -I../fifo
+SV_FILES = $(wildcard *.sv) \
+	   $(filter-out %test.sv,$(wildcard ../fifo/*.sv))
 
 .PHONY: sim
 sim waveform.vcd: ./obj_dir/V$(MODULE)
@@ -30,13 +30,13 @@ waves: waveform.vcd
 	@echo
 	@echo "### VERILATING ###"
 	verilator -Wall --trace --x-assign unique --x-initial unique \
-		$(INCLUDE_PATH) \
-		-cc $(MODULE).sv --exe tb_$(MODULE).cpp
+		-cc --exe tb_$(MODULE).cpp \
+		$(SV_FILES)
 	@touch .stamp.verilate
 
 .PHONY: lint
 lint: $(MODULE).sv
-	verilator --lint-only $(MODULE).sv
+	verilator --lint-only ./$(MODULE).sv
 
 .PHONY: prog
 prog:

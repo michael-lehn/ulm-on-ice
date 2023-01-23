@@ -16,10 +16,12 @@ module tx_pipe #(
     logic pop_front;
     logic [WIDTH-1:0] data_out;
 
+    logic [WIDTH-1:0] tx_data_in;
     logic tx_busy;
     logic tx_start;
+
     logic tx_done;
-    logic [WIDTH-1:0] tx_data_in;
+    assign tx_done = !tx_start && !tx_busy;
 
     always_ff @ (posedge clk) begin
 	if (rst) begin
@@ -30,7 +32,7 @@ module tx_pipe #(
 	    tx_start <= 0;
 	    pop_front <= 0;
 
-	    if (!tx_start && !tx_busy) begin
+	    if (tx_done) begin
 		pop_front <= !empty && !pop_front;
 	    end
 	    if (pop_front) begin
