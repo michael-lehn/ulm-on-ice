@@ -1,3 +1,29 @@
+/*
+ * FIFO
+ *
+ * push_back == 1 --> data_in is store in *next* cycle
+ * pop_front == 1 --> data_out is valid in *this* cycle
+ *
+ * Requirements:
+ * (1) "push_back <= 1" is illegal if full == 1  *or* push_back == 1
+ * (2) "pop_front <= 1" is illegal if empty == 1
+ * (3) "pop_front <= 1" is dangerous if empty == 1 *or* pop_front == 1
+ * 
+ * About (1): data_in has to stay valid until next cycle
+ * About (3): pop_front removes an element in the current cycle. But the
+ *            "empty status" is not updated until the next cycle. This code
+ *            would trigger a pop_front on an empty FIFO:
+ *
+ *            always_ff @ (posedge CLK) begin
+ *		  pop_front <= !empty;
+ *            end
+ *
+ *            If in cycle (n) the FIFO has one element then empty == 0.
+ *            Then in cycle (n+1) pop_front == 1 and (still) empty == 0.
+ *            In cycle (n+2) we then have  empty == 1 and (!) pop_front == 1.
+ */
+
+
 module fifo #(
     localparam SIZE = 4096,		// size of one EBR (Embedded Block RAM)
     localparam WIDTH = 8,		// each entry is one byte
@@ -18,6 +44,13 @@ module fifo #(
     localparam MAX_COUNT = DEPTH;
     logic [$bits(DEPTH)-1:0] count = 0;
 
+    // full / empty state
+    always_comb begin
+	full = count == MAX_COUNT;
+	empty = count == 0;
+    end
+
+    // update count
     always_ff @ (posedge clk) begin
 	if (rst) begin
 	    count <= 0;
@@ -32,19 +65,22 @@ module fifo #(
 	end
     end
 
-    // full / empty condition 
-    always_comb begin
-	full = count == MAX_COUNT;
-	empty = count == 0;
-    end
-
-    // Reading from an empty FIFO is not allowed. It is also illegal to
-    // trigger a pop_front if the fifo was empty in the last cycle
+    // Reading from an empty FIFO is not allowed. It is also error prone to
+    // trigger a pop_front if the fifo was empty in the previous cycle
     logic pop_front_error;
+    logic pop_front_warning;
     always_comb begin
-	pop_front_error = pop_front && (empty || empty_prev);
+	pop_front_error = pop_front && empty;
+	pop_front_warning = pop_front && empty_prev;
     end
 
+    always_ff @ (posedge clk) begin
+	if (!rst && pop_front_warning) begin
+	    $display("Warning: pop_front && empty_prev");
+	end
+    end
+
+    // keep track of empty state in previous cycle
     logic empty_prev;
     logic empty_r_set = 0;
     logic empty_r;
