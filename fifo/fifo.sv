@@ -79,11 +79,13 @@ module fifo #(
 	pop_front_warning = pop_front && empty_prev;
     end
 
+    `ifndef SYNTHESIS
     always_ff @ (posedge clk) begin
 	if (!rst && pop_front_warning) begin
 	    $display("Warning: pop_front && empty_prev");
 	end
     end
+    `endif
 
     // keep track of empty state in previous cycle
     logic empty_prev;
