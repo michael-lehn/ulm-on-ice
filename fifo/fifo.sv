@@ -1,8 +1,13 @@
 /*
  * FIFO
  *
- * push_back == 1 --> data_in is store in *next* cycle
- * pop_front == 1 --> data_out is valid in *this* cycle
+ * push_back == 1 --> data_in is stored in *next* cycle and an element
+ *		      appended to the back in the *next* cycle
+ * pop_front == 1 --> data_out is valid in *this* cycle and front element
+ *		      removed in *this* cycle
+ * 
+ * Side effect: If FIFO is not empty data_out is always valid and contains the
+ *		front element.
  *
  * Requirements:
  * (1) "push_back <= 1" is illegal if full == 1  *or* push_back == 1
@@ -20,7 +25,7 @@
  *
  *            If in cycle (n) the FIFO has one element then empty == 0.
  *            Then in cycle (n+1) pop_front == 1 and (still) empty == 0.
- *            In cycle (n+2) we then have  empty == 1 and (!) pop_front == 1.
+ *            In cycle (n+2) we then have empty == 1 and (!) pop_front == 1.
  */
 
 
