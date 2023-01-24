@@ -1,6 +1,6 @@
 module test(
     input logic CLK,
-    output TX
+    output logic TX
 );
 
     integer posedgeCount = 0;

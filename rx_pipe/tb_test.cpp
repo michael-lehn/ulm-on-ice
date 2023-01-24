@@ -1,4 +1,6 @@
 #include "Vtest.h"
+#include "Vtest_test.h"
+#include "Vtest_rx_pipe.h"
 
 #include <cstdlib>
 #include <iomanip>
@@ -6,9 +8,11 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
-#define MAX_SIM_TIME 70
+#define MAX_SIM_TIME 140
 std::uint64_t sim_time = 0;
 std::uint64_t posedge_cnt = 0;
+
+double sc_time_stamp() { return 0; }
 
 int
 main(int argc, char **argv, char **env)
@@ -26,6 +30,14 @@ main(int argc, char **argv, char **env)
 
 	if (dut->CLK == 1) {
 	    posedge_cnt++;
+	    switch (posedge_cnt) {
+		case 2:
+		    dut->test->rx_pipe1->rx_ready = 1;
+		    dut->test->rx_pipe1->rx_data_out = 'A';
+		    break;
+		default:
+		    ;
+	    }
 	}
 	dut->eval();
 

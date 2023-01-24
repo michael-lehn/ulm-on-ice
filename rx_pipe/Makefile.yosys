@@ -1,6 +1,7 @@
 vProject :=  test
 vSource := $(wildcard *.sv) \
-	   $(filter-out %test.sv,$(wildcard ../fifo/*.sv))
+	   $(filter-out %test.sv,$(wildcard ../fifo/*.sv)) \
+	   $(filter-out %test.sv,$(wildcard ../tx_pipe/*.sv))
 
 #INCLUDE += -p 'read_verilog -sv ../fifo/fifo.sv'
 #INCLUDE += -p 'read_verilog -sv ../fifo/dp_bram4096.sv'

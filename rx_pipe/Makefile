@@ -1,6 +1,8 @@
 MODULE=test
-SV_FILES = $(wildcard *.sv) \
-	   $(filter-out %test.sv,$(wildcard ../fifo/*.sv))
+SV_FILES = $(MODULE).sv \
+	   $(filter-out $(MODULE).sv,$(wildcard *.sv)) \
+	   $(filter-out %test.sv,$(wildcard ../fifo/*.sv)) \
+	   $(filter-out %test.sv,$(wildcard ../tx_pipe/*.sv))
 
 .PHONY: sim
 sim waveform.vcd: ./obj_dir/V$(MODULE)
