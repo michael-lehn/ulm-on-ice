@@ -1,4 +1,4 @@
-module test(
+module test (
     input logic CLK,
     input logic RX,
     output logic TX,

@@ -11,21 +11,12 @@
  *
  * Requirements:
  * (1) "push_back <= 1" is illegal if full == 1  *or* push_back == 1
- * (2) "pop_front <= 1" is illegal if empty == 1
- * (3) "pop_front <= 1" is dangerous if empty == 1 *or* pop_front == 1
+ * (2) "pop_front <= 1" is illegal if empty == 1 *or* pop_front == 1
  * 
  * About (1): data_in has to stay valid until next cycle
- * About (3): pop_front removes an element in the current cycle. But the
- *            "empty status" is not updated until the next cycle. This code
- *            would trigger a pop_front on an empty FIFO:
- *
- *            always_ff @ (posedge CLK) begin
- *		  pop_front <= !empty;
- *            end
- *
- *            If in cycle (n) the FIFO has one element then empty == 0.
- *            Then in cycle (n+1) pop_front == 1 and (still) empty == 0.
- *            In cycle (n+2) we then have empty == 1 and (!) pop_front == 1.
+ * About (2): pop_front removes an element in the current cycle. But it
+ *	      takes an extra cycle until data_out is updated with the
+ *	      new front element.
  */
 
 
@@ -37,8 +28,8 @@ module fifo #(
 ) (
     input logic clk,
     input logic rst,
-    input logic pop_front,
     input logic push_back,
+    input logic pop_front,
     input logic [WIDTH-1:0] data_in,
     output logic [WIDTH-1:0] data_out,
     output logic empty,
