@@ -1,8 +1,8 @@
-##About
+## About
 
 Testing a pipe to send characters to the serial port.
 
-##Usage
+## Usage
 
 `make` runs simulation (verilator)
 `make yosys` synthesises 
