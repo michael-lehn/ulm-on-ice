@@ -135,8 +135,7 @@ module test (
 	.error(rx_error)
     );
 
-    hex_lexer hex_lexer1
-    (
+    hex_lexer hex_lexer1 (
 	.clk(CLK),
 	.rst(rst),
 	.push_back(hex_push_back),

@@ -13,7 +13,7 @@ module dp_bram4096 #(
     output logic [WIDTH-1:0] data_out
 );
 
-    logic [WIDTH-1:0] mem [2**ADDRW];
+    logic [WIDTH-1:0] mem [DEPTH];
 
     always @ (posedge clk_in) begin : write
 	if (en_in) begin
@@ -23,6 +23,6 @@ module dp_bram4096 #(
 
     always @(posedge clk_out) begin : read
 	data_out <= mem[addr_out];
-    end
+    end : read
 
 endmodule

@@ -25,13 +25,28 @@ logic mem_write = 1'b0;
 logic [7:0] mem_data_in;
 logic [7:0] mem_data_out;
 
-mem mem_inst(
+mem mem0(
     .clk(CLK),
     .addr(mem_addr),
     .write(mem_write),
     .data_in(mem_data_in),
     .data_out(mem_data_out)
 );
+
+logic [14:0] mem_addr1 = 0;
+logic mem_write1 = 1'b0;
+logic [7:0] mem_data_in1;
+logic [7:0] mem_data_out1;
+
+
+mem mem1(
+    .clk(CLK),
+    .addr(mem_addr1),
+    .write(mem_write1),
+    .data_in(mem_data_in1),
+    .data_out(mem_data_out1)
+);
+
 
 // From the "pll uart" example. When tx_start is 1 the byte in tx_char gets
 // transmitted. tx_busy == 1 indicates that we are currently sending.
@@ -61,9 +76,12 @@ always @ (posedge CLK) begin
 	// Write some bytes to SPRAM
 	// - Store 'A', .., 'D' at addresses 0, .., 3 respectively.
 	mem_write <= 1'b1;
+	mem_write1 <= 1'b1;
 	mem_data_in[7:0] <= trunc_15_to_8(15'd65 + init_mem_addr);
+	mem_data_in1[7:0] <= trunc_15_to_8(15'd65 + init_mem_addr);
 	// Increment address. If address 3 was initialized we are done.
 	mem_addr <= init_mem_addr;
+	mem_addr1 <= init_mem_addr;
 	init_mem_addr <= init_mem_addr + 1;
 	if (init_mem_addr[1:0] == 2'b11)
 	    init_done <= 1'b1;
@@ -81,6 +99,8 @@ always @ (posedge CLK) begin
 		    end
 		    mem_write <= 1'b0;
 		    mem_addr <= (mem_addr + 1) % 4;
+		    mem_write1 <= 1'b0;
+		    mem_addr1 <= (mem_addr1 + 1) % 4;
 		end
 	    RUN_FETCH:
 		// Idle one cycle so that fetching a byte is done
@@ -95,7 +115,11 @@ always @ (posedge CLK) begin
 		    run_state <= RUN_TX_WAIT;
 		end
 	    default:
-		;
+		if (~tx_busy) begin
+		    tx_char <= mem_data_out1;
+		    tx_start <= 1'b1;
+		    run_state <= RUN_TX_WAIT;
+		end
 	endcase
     end
 end
