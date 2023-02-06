@@ -26,18 +26,14 @@ module test(
     always_ff @ (posedge CLK) begin
 	push_back <= !push_back && !full;
 	if (push_back) begin
-	    if (data_in >= "A" && data_in < "Z") begin
-		data_in <= data_in + 1;
-	    end
-	    else if (data_in == "Z") begin
-		data_in <= "\n";
-	    end
-	    else if (data_in == "\n") begin
-		data_in <= "\r";
-	    end
-	    else begin
-		data_in <= "A";
-	    end
+	    case (data_in)
+		"Z":
+		    data_in <= "\n";
+		"\n":
+		    data_in <= "A";
+		default:
+		    data_in <= data_in + 1;
+	    endcase
 	end
     end
 

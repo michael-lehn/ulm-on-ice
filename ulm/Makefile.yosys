@@ -1,12 +1,6 @@
 vProject :=  test
-vFilesAll := \
-	$(wildcard *.sv) \
-	$(wildcard ../fifo/*.sv) \
-	$(wildcard ../tx_pipe/*.sv) \
-	$(wildcard ../reg_file/*.sv) \
-	$(wildcard ../ram/*.sv)
-vFiles := $(filter-out %test.sv,$(vFilesAll))
-vSource := $(vProject).sv $(vFiles)
+svSource := $(wildcard *.sv)
+vSource := test.v
 
 #INCLUDE += -p 'read_verilog -sv ../fifo/fifo.sv'
 #INCLUDE += -p 'read_verilog -sv ../fifo/dp_bram4096.sv'
@@ -25,7 +19,7 @@ synTool := yosys
 synTool.flags := \
     	-ql $(vProject.log) \
 	$(INCLUDE) \
-    	-p 'synth_ice40 -top $(vProject) -json $(vProject.json)'
+    	-p 'synth_ice40 -abc9 -dffe_min_ce_use 4 -device u -dsp -top $(vProject) -json $(vProject.json)'
 
 pnr := nextpnr-ice40
 pnr.flags := --up5k --package sg48 --json $(vProject.json) --pcf $(pcf) --asc
@@ -34,6 +28,9 @@ pack := icepack
 prog := iceprog
 
 all: $(vProject.bin)
+
+$(vSource) : $(svSource)
+	sv2v --define=SYNTHESIS --write=$@ $^
 
 $(vProject.json) : $(vSource)
 	$(synTool) $(synTool.flags) $(vSource)
@@ -48,4 +45,5 @@ prog:	$(vProject.bin)
 	$(prog) $(vProject.bin)
 
 clean:
+	$(RM) $(vSource)
 	$(RM) $(vProject.json) $(vProject.asc) $(vProject.bin) $(vProject.log)

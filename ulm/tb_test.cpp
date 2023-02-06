@@ -6,11 +6,9 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
-#define MAX_SIM_TIME 540
+#define MAX_SIM_TIME 3900
 std::uint64_t sim_time = 0;
 std::uint64_t posedge_cnt = 0;
-
-double sc_time_stamp() { return 0; }
 
 int
 main(int argc, char **argv, char **env)
@@ -29,6 +27,7 @@ main(int argc, char **argv, char **env)
 	if (dut->CLK == 1) {
 	    posedge_cnt++;
 	}
+	//spram_dev.sim();
 	dut->eval();
 
 	m_trace->dump(sim_time);

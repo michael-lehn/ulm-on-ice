@@ -40,6 +40,18 @@ module fifo #(
     logic [ADDRW:0] read_ptr = 0;
     logic [ADDRW:0] write_ptr = 0;
 
+    integer init_count = 0;
+    logic init = 0;
+
+    always_ff @ (posedge clk) begin
+	if (init_count < 60) begin
+	    init_count <= init_count + 1;
+	end
+	else begin
+	    init <= 1;
+	end
+    end
+
     always_ff @ (posedge clk) begin
 	if (rst) begin
 	    read_ptr <= 0;
@@ -60,7 +72,8 @@ module fifo #(
 
     always_comb begin
 	full = read_ptr[ADDRW] !=  write_ptr[ADDRW]
-	    && read_ptr[ADDRW-1:0] == write_ptr[ADDRW-1:0];
+	    && read_ptr[ADDRW-1:0] == write_ptr[ADDRW-1:0]
+	    || !init;
 	empty = read_ptr == write_ptr;
     end
 

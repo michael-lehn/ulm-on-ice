@@ -31,6 +31,7 @@ waves: waveform.vcd
 	@echo "### VERILATING ###"
 	verilator -Wall --trace --x-assign unique --x-initial unique \
 		-cc --exe tb_$(MODULE).cpp \
+		--top-module $(MODULE) \
 		$(SV_FILES)
 	@touch .stamp.verilate
 
