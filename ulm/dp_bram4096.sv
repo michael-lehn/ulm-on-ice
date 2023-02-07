@@ -2,8 +2,7 @@ module dp_bram4096 #(
     parameter WIDTH = 8,
     localparam SIZE = 4096, // total bits
     localparam DEPTH = SIZE / WIDTH,
-    localparam ADDRW = $clog2(DEPTH),
-    localparam INIT_CLK_COUNT = 60
+    localparam ADDRW = $clog2(DEPTH)
 ) (
     input logic clk_in,
     input logic en_in,
@@ -15,7 +14,9 @@ module dp_bram4096 #(
 
     logic [WIDTH-1:0] mem [DEPTH] /* synthesis syn_ramstyle = "no_rw_check" */;
 
-    initial mem[0] <= 255;
+    initial begin
+	mem[0] = 255;
+    end
 
     always @ (posedge clk_in) begin : write
 	if (en_in) begin

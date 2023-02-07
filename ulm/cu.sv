@@ -15,11 +15,14 @@ module cu (
     output if_dev_alu dev_alu,
     output logic putc,
     output logic [pkg_ram::RAM_BYTE-1:0] putc_char,
-    output logic [3:0] led
+    output logic halted,
+    output logic [pkg_ram::RAM_BYTE-1:0] exit_code
 );
     pkg_cu::state_t cu_state = pkg_cu::CU_FETCH;
     pkg_cu::state_t cu_state_next;
     logic [31:0] cu_ir = 0;
+
+    assign halted = cu_state == pkg_cu::CU_HALTED;
 
     //
     // decode instructions into instructions
@@ -28,6 +31,10 @@ module cu (
     if_instr_io instr_io();
     if_instr_alu instr_alu();
     if_instr_bus instr_bus();
+
+    assign exit_code = instr_cu.op == pkg_cu::CU_HALT
+		     ? instr_cu.exit_code
+		     : 8'hff;
 
     logic decoder_en;
 
@@ -161,6 +168,12 @@ module cu (
     // control register file operations
     //
     always_comb begin
+	dev_reg_file.addr_out0 = 0;
+	dev_reg_file.addr_out1 = 0;
+	dev_reg_file.addr_in = 0;
+	dev_reg_file.data_in = 0;
+	dev_reg_file.op = pkg_reg::REG_READ_ONLY;
+
 	if (instr_alu.op != pkg_alu::ALU_NOP) begin
 	    dev_reg_file.addr_out0 = instr_alu.a_reg;
 	    dev_reg_file.addr_out1 = instr_alu.b_reg;
@@ -179,18 +192,9 @@ module cu (
 	    dev_reg_file.addr_in = 0;
 	    dev_reg_file.data_in = 0;
 	end
-	else begin
-	    dev_reg_file.addr_out0 = 0;
-	    dev_reg_file.addr_out1 = 0;
-	    dev_reg_file.addr_in = 0;
-	    dev_reg_file.data_in = 0;
-	end
 
 	if (en && cu_state == pkg_cu::CU_INCREMENT) begin
 	    dev_reg_file.op = pkg_reg::REG_WRITE;
-	end
-	else begin
-	    dev_reg_file.op = pkg_reg::REG_READ_ONLY;
 	end
     end
 
@@ -215,6 +219,8 @@ module cu (
     // control IO operations
     //
     always_comb begin
+	putc = 0;
+	putc_char = 0;
 	case ({cu_state == pkg_cu::CU_EXECUTE, instr_io.op})
 	    {1'b1, pkg_io::IO_PUTC_REG}:
 		begin
@@ -227,35 +233,8 @@ module cu (
 		    putc_char = instr_io.char_imm;
 		end
 	    default:
-		begin
-		    putc = 0;
-		    putc_char = 0;
-		end
+		;
 	endcase
-    end
- 
-    //
-    // for debugging and effects
-    //
-    always_ff @ (posedge clk) begin
-	led[0] <= 0;
-	led[1] <= 0;
-	led[2] <= 0;
-	led[3] <= 0;
-	/*
-	if (cu_state == pkg_cu::CU_DECODE) begin
-	    led[0] <= instr_cu.op != pkg_cu::CU_NOP;
-	    led[1] <= instr_io.op != pkg_io::IO_NOP;
-	    led[2] <= instr_alu.op != pkg_alu::ALU_NOP;
-	    led[3] <= instr_bus.op != pkg_bus::BUS_NOP;
-	end
-	else if (cu_state == pkg_cu::CU_INCREMENT) begin
-	    led[0] <= 0;
-	    led[1] <= 0;
-	    led[2] <= 0;
-	    led[3] <= 0;
-	end
-	*/
     end
 
 endmodule

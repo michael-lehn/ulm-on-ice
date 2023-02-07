@@ -42,9 +42,6 @@ module decoder (
 	end
     end
 
-    /*
-    */
-
     always_comb begin
 	instr_cu_next.op = pkg_cu::CU_NOP;
 	instr_cu_next.exit_code = ir[23:16];
@@ -92,7 +89,6 @@ module decoder (
 
 	instr_alu_next.op = pkg_alu::ALU_NOP;
 	instr_alu_next.a_sel = pkg_alu::ALU_REG;
-
 	case (op)
 	    8'h10: // ldzwq a, %s  becomes a + %0 -> %s
 		begin

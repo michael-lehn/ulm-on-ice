@@ -31,46 +31,33 @@ main(int argc, char **argv, char **env)
 	    posedge_cnt++;
 
 	    switch (posedge_cnt) {
-		// 0x31
 		case 10:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '3';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = 'A';
 		    break;
 		case 12:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '1';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = 'x';
 		    break;
-		// 0x41
 		case 14:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '4';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = 'F';
 		    break;
 		case 16:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '1';
 		    break;
-		// 0x00
 		case 18:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = 'a';
 		    break;
 		case 20:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '\n';
 		    break;
-		// 0x00
 		case 22:
 		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-		case 24:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-
-		case 26:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '\n';
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = 0;
 		    break;
 	    }
 	}
