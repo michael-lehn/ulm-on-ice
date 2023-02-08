@@ -25,39 +25,16 @@ module cu (
     assign halted = cu_state == pkg_cu::CU_HALTED;
 
     //
-    // decode instructions into instructions
+    // Interface to current instruction
     //
     if_instr_cu instr_cu();
     if_instr_io instr_io();
     if_instr_alu instr_alu();
     if_instr_bus instr_bus();
 
-    assign exit_code = instr_cu.op == pkg_cu::CU_HALT
-		     ? instr_cu.exit_code
-		     : 8'hff;
-
-    logic decoder_en;
-
-    always_comb begin
-	decoder_en = en && (cu_state == pkg_cu::CU_DECODE);
-    end
-    
-
-    decoder decoder0(
-	.clk(clk),
-	.en(decoder_en),
-	.ir(cu_ir),
-	.stat_reg_zf(dev_alu.stat_reg_zf),
-	.instr_cu(instr_cu),
-	.instr_io(instr_io),
-	.instr_alu(instr_alu),
-	.instr_bus(instr_bus)
-    );
-
     //
     // von Neumann cycle
     //
-
     always_ff @ (posedge clk) begin
 	cu_state <= cu_state_next;
     end
@@ -93,94 +70,125 @@ module cu (
     end
 
     //
-    // control jump instructions
+    // Define how control unit accesses RAM
     //
+    if_dev_ram cu_ram();
 
+    always_comb begin
+	cu_ram.addr = cu_ip;
+	cu_ram.size = pkg_ram::RAM_LONG;;
+	cu_ram.data_in = 0;
+	cu_ir = cu_ram.data_out[31:0];
+	cu_ram.op = pkg_ram::RAM_FETCH;
+    end
+
+    //
+    // instructions and data share the same RAM
+    //
+    if_dev_ram instr_ram();
+
+    always_comb begin
+	cu_ram.data_out = dev_ram.data_out;
+	instr_ram.data_out = dev_ram.data_out;
+
+	case (cu_state)
+	     pkg_cu::CU_FETCH, pkg_cu::CU_DECODE:
+		begin
+		    dev_ram.addr = cu_ip;
+		    dev_ram.op = cu_ram.op;
+		    dev_ram.size = cu_ram.size;
+		    dev_ram.data_in = cu_ram.data_in;
+		end
+	    default:
+		begin
+		    dev_ram.addr = instr_ram.addr;
+		    dev_ram.op = instr_ram.op;
+		    dev_ram.size = instr_ram.size;
+		    dev_ram.data_in = instr_ram.data_in;
+		end
+	endcase
+    end
+
+    //
+    // decode instructions into instructions
+    //
+    logic decoder_en;
+
+    always_comb begin
+	decoder_en = en && (cu_state == pkg_cu::CU_DECODE);
+    end
+    
+    decoder decoder0(
+	.clk(clk),
+	.en(decoder_en),
+	.ir(cu_ir),
+	.stat_reg_zf(dev_alu.stat_reg_zf),
+	.instr_cu(instr_cu),
+	.instr_io(instr_io),
+	.instr_alu(instr_alu),
+	.instr_bus(instr_bus)
+    );
+
+    //
+    // control cu instructions (jump and halt)
+    //
     logic [pkg_ram::RAM_ADDRW-1:0] cu_ip = 0;
     logic [pkg_ram::RAM_ADDRW-1:0] cu_ip_next;
 
+    assign exit_code = instr_cu.op == pkg_cu::CU_HALT
+		     ? instr_cu.exit_code
+		     : 8'hff;
+
     always_ff @ (posedge clk) begin
-	cu_ip <= cu_ip_next;
+	if (en && cu_state == pkg_cu::CU_INCREMENT) begin
+	    cu_ip <= cu_ip_next;
+	end
     end
 
     always_comb begin
-	cu_ip_next = cu_ip;
+	cu_ip_next = cu_ip + 4;
 
-	if (en && cu_state ==  pkg_cu::CU_INCREMENT) begin
-	    if (instr_cu.op != pkg_cu::CU_JMP) begin
-		cu_ip_next = cu_ip + 4;
-	    end
-	    else begin
+	case (instr_cu.op)
+	    pkg_cu::CU_REL_JMP:
 		cu_ip_next = cu_ip
 			   + 4 * instr_cu.jmp_offset[pkg_ram::RAM_ADDRW-1:0];
-	    end
-	end
+	    default:
+		;
+	endcase
     end
 
     //
     // control ram operations
     //
     always_comb begin
-	if (cu_state == pkg_cu::CU_FETCH) begin
-	    dev_ram.op = pkg_ram::RAM_FETCH;
-	    dev_ram.size = pkg_ram::RAM_LONG;
-	    dev_ram.addr = cu_ip;
-	    dev_ram.data_in = 0;
-	    cu_ir = 0;
-	end
-	else if (cu_state == pkg_cu::CU_DECODE) begin
-	    dev_ram.op = pkg_ram::RAM_NOP;
-	    dev_ram.size = pkg_ram::RAM_LONG;
-	    dev_ram.addr = cu_ip;
-	    dev_ram.data_in = 0;
-	    cu_ir = dev_ram.data_out[31:0];
-	end
-	else if (cu_state == pkg_cu::CU_EXECUTE
-	      && instr_bus.op == pkg_bus::BUS_FETCH)
-	begin
-	    dev_ram.op = pkg_ram::RAM_FETCH;
-	    dev_ram.size = instr_bus.size;
-	    dev_ram.addr = dev_reg_file.data_out0[pkg_ram::RAM_ADDRW-1:0]
-			 + instr_bus.addr_offset;
-	    dev_ram.data_in = 0;
-	    cu_ir = 0;
-	end
-	else if (cu_state == pkg_cu::CU_INCREMENT
-	      && instr_bus.op == pkg_bus::BUS_FETCH)
-	begin
-	    dev_ram.op = pkg_ram::RAM_NOP;
-	    dev_ram.size = instr_bus.size;
-	    dev_ram.addr = dev_reg_file.data_out0[pkg_ram::RAM_ADDRW-1:0]
-			 + instr_bus.addr_offset;
-	    dev_ram.data_in = 0;
-	    cu_ir = 0;
-	end
-	else begin
-	    dev_ram.op = pkg_ram::RAM_NOP;
-	    dev_ram.size = pkg_ram::RAM_BYTE;
-	    dev_ram.addr = 0;
-	    dev_ram.data_in = 0;
-	    cu_ir = 0;
-	end
+	instr_ram.size = instr_bus.size;
+	instr_ram.addr = dev_reg_file.data_out0[pkg_ram::RAM_ADDRW-1:0]
+		       + instr_bus.addr_offset;
+	instr_ram.data_in = 0;
+	instr_ram.op = pkg_ram::RAM_NOP;
+
+	case (instr_bus.op)
+	    pkg_bus::BUS_FETCH:
+		instr_ram.op = pkg_ram::RAM_FETCH;
+	    default:
+		;
+	endcase
     end
 
     //
     // control register file operations
     //
     always_comb begin
-	dev_reg_file.addr_out0 = 0;
-	dev_reg_file.addr_out1 = 0;
-	dev_reg_file.addr_in = 0;
-	dev_reg_file.data_in = 0;
-	dev_reg_file.op = pkg_reg::REG_READ_ONLY;
+	// defaults are for ALU instructions
+	dev_reg_file.addr_out0 = instr_alu.a_reg;
+	dev_reg_file.addr_out1 = instr_alu.b_reg;
+	dev_reg_file.addr_in = instr_alu.s_reg;
+	dev_reg_file.data_in = dev_alu.s;
+	dev_reg_file.op = en && cu_state == pkg_cu::CU_INCREMENT
+			? pkg_reg::REG_WRITE
+			: pkg_reg::REG_READ_ONLY;
 
-	if (instr_alu.op != pkg_alu::ALU_NOP) begin
-	    dev_reg_file.addr_out0 = instr_alu.a_reg;
-	    dev_reg_file.addr_out1 = instr_alu.b_reg;
-	    dev_reg_file.addr_in = instr_alu.s_reg;
-	    dev_reg_file.data_in = dev_alu.s;
-	end
-	else if (instr_bus.op == pkg_bus::BUS_FETCH) begin
+	if (instr_bus.op == pkg_bus::BUS_FETCH) begin
 	    dev_reg_file.addr_out0 = instr_bus.addr_reg;
 	    dev_reg_file.addr_out1 = 0;
 	    dev_reg_file.addr_in = instr_bus.data_reg;
@@ -191,10 +199,6 @@ module cu (
 	    dev_reg_file.addr_out1 = 0;
 	    dev_reg_file.addr_in = 0;
 	    dev_reg_file.data_in = 0;
-	end
-
-	if (en && cu_state == pkg_cu::CU_INCREMENT) begin
-	    dev_reg_file.op = pkg_reg::REG_WRITE;
 	end
     end
 
@@ -220,7 +224,8 @@ module cu (
     //
     always_comb begin
 	putc = 0;
-	putc_char = 0;
+	putc_char = instr_io.char_imm;
+
 	case ({cu_state == pkg_cu::CU_EXECUTE, instr_io.op})
 	    {1'b1, pkg_io::IO_PUTC_REG}:
 		begin
@@ -230,7 +235,6 @@ module cu (
 	    {1'b1, pkg_io::IO_PUTC_IMM}:
 		begin
 		    putc = 1;
-		    putc_char = instr_io.char_imm;
 		end
 	    default:
 		;

@@ -52,14 +52,14 @@ module decoder (
 		instr_cu_next.op = pkg_cu::CU_HALT;
 	    8'h02: // jnz offset
 		instr_cu_next.op = !stat_reg_zf
-				 ? pkg_cu::CU_JMP
+				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
 	    8'h03: // jz offset
 		instr_cu_next.op = stat_reg_zf
-				 ? pkg_cu::CU_JMP
+				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
 	    8'h04: // jmp offset
-		instr_cu_next.op = pkg_cu::CU_JMP;
+		instr_cu_next.op = pkg_cu::CU_REL_JMP;
 	    default:
 		;
 	endcase
@@ -89,6 +89,7 @@ module decoder (
 
 	instr_alu_next.op = pkg_alu::ALU_NOP;
 	instr_alu_next.a_sel = pkg_alu::ALU_REG;
+
 	case (op)
 	    8'h10: // ldzwq a, %s  becomes a + %0 -> %s
 		begin
@@ -101,7 +102,6 @@ module decoder (
 	    8'h11: // addq %a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_ADD;
-		    instr_alu_next.a_sel = pkg_alu::ALU_REG;
 		end
 	    8'h12: // addq a, %b, %s
 		begin
@@ -111,7 +111,6 @@ module decoder (
 	    8'h13: // subq %a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SUB;
-		    instr_alu_next.a_sel = pkg_alu::ALU_REG;
 		    instr_alu_next.s_reg = ir[23:20];
 		end
 	    8'h14: // subq a, %b, %s

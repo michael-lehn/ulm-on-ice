@@ -28,9 +28,7 @@ module test (
     assign btn1_released = !btn1_r && BTN1;
 
     logic btn2_r = 0;
-    /* verilator lint_off UNUSEDSIGNAL */
     logic btn2_released;
-    /* verilator lint_on UNUSEDSIGNAL */
     assign btn2_released = !btn2_r && BTN2;
 
     always @ (posedge CLK) begin
@@ -226,21 +224,26 @@ module test (
     if_dev_ram sel_ram();
 
     always_comb begin
-	if (!loader_done) begin
-	    sel_ram.addr = loader_ram.addr;
-	    sel_ram.op = loader_ram.op;
-	    sel_ram.size = loader_ram.size;
-	    sel_ram.data_in = loader_ram.data_in;
-	end
-	else begin
-	    sel_ram.addr = dev_ram.addr;
-	    sel_ram.op = dev_ram.op;
-	    sel_ram.size = dev_ram.size;
-	    sel_ram.data_in = dev_ram.data_in;
-	end
-
 	loader_ram.data_out = sel_ram.data_out;
 	dev_ram.data_out = sel_ram.data_out;
+	case (loader_done)
+	    1'b0:
+		begin
+		    sel_ram.addr = loader_ram.addr;
+		    sel_ram.op = loader_ram.op;
+		    sel_ram.size = loader_ram.size;
+		    sel_ram.data_in = loader_ram.data_in;
+		end
+	    1'b1:
+		begin
+		    sel_ram.addr = dev_ram.addr;
+		    sel_ram.op = dev_ram.op;
+		    sel_ram.size = dev_ram.size;
+		    sel_ram.data_in = dev_ram.data_in;
+		end
+	    default:
+		;
+	endcase
     end
 
     dev_ram dev_ram0(
@@ -250,25 +253,31 @@ module test (
  
     //-- input/output devices --------------------------------------------------
     
-    logic tx_loader, tx_ulm;
-    assign TX = loader_done ? tx_ulm : tx_loader;
+    if_dev_tx_pipe tx_pipe_sel();
+
+    always_comb begin
+	tx_pipe.full = tx_pipe_sel.full;
+	tx_pipe_loader.full = tx_pipe_sel.full;
+
+	if (loader_done) begin
+	    tx_pipe_sel.rst = tx_pipe.rst;
+	    tx_pipe_sel.push_back = tx_pipe.push_back;
+	    tx_pipe_sel.data_in = tx_pipe.data_in;
+	end
+	else begin
+	    tx_pipe_sel.rst = tx_pipe_loader.rst;
+	    tx_pipe_sel.push_back = tx_pipe_loader.push_back;
+	    tx_pipe_sel.data_in = tx_pipe_loader.data_in;
+	end
+    end
 
     dev_tx_pipe #(
 	.CLK_FREQ(clk_freq),
 	.BAUD(baud)
     ) dev_tx_pipe0 (
 	.clk(CLK),
-	.tx_pipe(tx_pipe_loader),
-	.tx(tx_loader)
-    );
-
-    dev_tx_pipe #(
-	.CLK_FREQ(clk_freq),
-	.BAUD(baud)
-    ) dev_tx_pipe1 (
-	.clk(CLK),
-	.tx_pipe(tx_pipe),
-	.tx(tx_ulm)
+	.tx_pipe(tx_pipe_sel),
+	.tx(TX)
     );
 
     dev_rx_pipe #(

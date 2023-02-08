@@ -11,30 +11,8 @@ module dev_loader (
     output logic done
 );
 
-    logic eoi;
-
-    logic done_r = 0, done_r2 = 0;
-
-    initial begin
-	eoi = 0;
-	done = 0;
-    end
-
-    always_ff @ (posedge clk) begin
-	if (rst) begin
-	    eoi <= 0;
-	    done <= 0;
-	end
-	else begin
-	    done <= done_r; // delay to print '\n'
-	    done_r <= done_r2;
-	    if (data_en && (data_in == ">")) begin
-		done_r2 <= 1;
-	    end
-	    if (eoi && ram.op == pkg_ram::RAM_NOP) begin
-		done_r2 <= 1;
-	    end
-	end
+    always_comb begin
+	done = data_in == ">" && ram.op == pkg_ram::RAM_NOP;
     end
 
     logic [pkg_ram::RAM_NIBBLE-1:0] low_nibble, high_nibble;

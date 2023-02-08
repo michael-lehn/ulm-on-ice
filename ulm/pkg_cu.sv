@@ -6,7 +6,7 @@ package pkg_cu;
 typedef enum {
     CU_NOP,
     CU_HALT,
-    CU_JMP
+    CU_REL_JMP
 } op_t;
 
 typedef enum {
