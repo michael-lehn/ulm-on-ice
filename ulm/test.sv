@@ -160,7 +160,9 @@ module test (
 
     always_ff @ (posedge CLK) begin
 	// print what was typed
-	rx_pipe.pop_front <= !rx_pipe.pop_front && !rx_pipe.empty;
+	if (!cu_tx) begin
+	    rx_pipe.pop_front <= !rx_pipe.pop_front && !rx_pipe.empty;
+	end
 
 	tx_pipe.data_in <= putc_char;
 	tx_pipe.push_back <= putc && !tx_pipe.push_back

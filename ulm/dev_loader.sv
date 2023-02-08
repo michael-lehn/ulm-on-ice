@@ -14,8 +14,7 @@ module dev_loader (
     initial done = 0;
 
     always_ff @ (posedge clk) begin
-	//done = data_in == ">" && ram.op == pkg_ram::RAM_NOP;
-	if (data_in == ">") begin
+	if (data_in == 8'h04 && ram.op == pkg_ram::RAM_NOP) begin
 	    done <= 1;
 	end
     end
