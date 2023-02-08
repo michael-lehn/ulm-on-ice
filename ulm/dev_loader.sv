@@ -11,8 +11,13 @@ module dev_loader (
     output logic done
 );
 
-    always_comb begin
-	done = data_in == ">" && ram.op == pkg_ram::RAM_NOP;
+    initial done = 0;
+
+    always_ff @ (posedge clk) begin
+	//done = data_in == ">" && ram.op == pkg_ram::RAM_NOP;
+	if (data_in == ">") begin
+	    done <= 1;
+	end
     end
 
     logic [pkg_ram::RAM_NIBBLE-1:0] low_nibble, high_nibble;
@@ -28,7 +33,7 @@ module dev_loader (
 	    nibble <= 0;
 	end
 	else begin
-	    if (data_en && nibble_val < 16) begin
+	    if (!done && data_en && nibble_val < 16) begin
 		nibble <= !nibble;
 		case (nibble)
 		    1'b0:

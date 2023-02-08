@@ -16,13 +16,16 @@ module cu (
     output logic putc,
     output logic [pkg_ram::RAM_BYTE-1:0] putc_char,
     output logic halted,
-    output logic [pkg_ram::RAM_BYTE-1:0] exit_code
+    output logic [pkg_ram::RAM_BYTE-1:0] exit_code,
+    output tx_req
 );
     pkg_cu::state_t cu_state = pkg_cu::CU_FETCH;
     pkg_cu::state_t cu_state_next;
     logic [31:0] cu_ir = 0;
 
     assign halted = cu_state == pkg_cu::CU_HALTED;
+    assign tx_req = cu_state == pkg_cu::CU_EXECUTE
+		 || cu_state == pkg_cu::CU_INCREMENT;
 
     //
     // Interface to current instruction

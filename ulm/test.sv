@@ -148,10 +148,8 @@ module test (
     //
 
     //-- CU (Control unit) -----------------------------------------------------
-    /* verilator lint_off UNUSEDSIGNAL */
     logic putc;
     logic [7:0] putc_char, exit_code;
-    /* verilator lint_on UNUSEDSIGNAL */
 
     if_dev_reg_file dev_reg_file();
     if_dev_ram dev_ram();
@@ -163,28 +161,28 @@ module test (
     always_ff @ (posedge CLK) begin
 	// print what was typed
 	rx_pipe.pop_front <= !rx_pipe.pop_front && !rx_pipe.empty;
-	if (loader_done) begin
-	    tx_pipe.push_back <= rx_pipe.pop_front && !tx_pipe.push_back
-			      && !tx_pipe.full;
-	    tx_pipe.data_in <= putc_char;
-	    tx_pipe.push_back <= putc && !tx_pipe.push_back
-			      && !tx_pipe.full;
-	end
-	else begin
-	    loader_push_back <= rx_pipe.pop_front;
-	    loader_data_in <= rx_pipe.data_out;
-	    tx_pipe_loader.data_in <=  rx_pipe.data_out;
-	    tx_pipe_loader.push_back <= rx_pipe.pop_front
-				     && !tx_pipe_loader.push_back
-				     && !tx_pipe_loader.full;
-	end
 
-	    
-	cu_en <= loader_done;
+	tx_pipe.data_in <= putc_char;
+	tx_pipe.push_back <= putc && !tx_pipe.push_back
+			  && !tx_pipe.full;
+
+	tx_pipe_loader.data_in <= rx_pipe.data_out;
+	tx_pipe_loader.push_back <= rx_pipe.pop_front && !tx_pipe.push_back
+			         && !tx_pipe_loader.full;
+
+	loader_push_back <= rx_pipe.pop_front;
+	loader_data_in <= rx_pipe.data_out;
+
+    end
+
+    always_comb begin
+	cu_en = loader_done && !rx_pipe.pop_front;
     end
 
     logic halted;
     assign LED2 = halted;
+
+    logic cu_tx;
 
     cu cu0(
 	.clk(CLK),
@@ -195,7 +193,8 @@ module test (
 	.putc(putc),
 	.putc_char(putc_char),
 	.halted(halted),
-	.exit_code(exit_code)
+	.exit_code(exit_code),
+	.tx_req(cu_tx)
     );
 
     //
@@ -252,14 +251,13 @@ module test (
     );
  
     //-- input/output devices --------------------------------------------------
-    
     if_dev_tx_pipe tx_pipe_sel();
 
     always_comb begin
 	tx_pipe.full = tx_pipe_sel.full;
 	tx_pipe_loader.full = tx_pipe_sel.full;
 
-	if (loader_done) begin
+	if (cu_tx) begin
 	    tx_pipe_sel.rst = tx_pipe.rst;
 	    tx_pipe_sel.push_back = tx_pipe.push_back;
 	    tx_pipe_sel.data_in = tx_pipe.data_in;
@@ -270,7 +268,7 @@ module test (
 	    tx_pipe_sel.data_in = tx_pipe_loader.data_in;
 	end
     end
-
+    
     dev_tx_pipe #(
 	.CLK_FREQ(clk_freq),
 	.BAUD(baud)
