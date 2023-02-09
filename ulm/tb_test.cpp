@@ -9,9 +9,17 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
-#define MAX_SIM_TIME 70 
-std::uint64_t sim_time = 0;
-std::uint64_t posedge_cnt = 0;
+#define MAX_SIM_TIME 700 
+
+unsigned char prog[] = {
+    '1', '0', '1', '0', '0', '0', '1', '0', '2', '0', '2', '1', '0', '0',
+    '0', '0', '3', '0', '2', '0', '0', '0', '0', '0', '0', '1', '0', '4',
+    '0', '0', '0', '0', '4', '8', '0', '0', '0', '0', '0', '0',
+    0x04,
+    
+};
+
+constexpr std::size_t prog_size = sizeof prog / sizeof prog[0];
 
 int
 main(int argc, char **argv, char **env)
@@ -23,6 +31,10 @@ main(int argc, char **argv, char **env)
     dut->trace(m_trace, 5);
     m_trace->open("waveform.vcd");
 
+    std::uint64_t sim_time = 0;
+    std::uint64_t posedge_cnt = 0;
+    std::uint64_t numLoaded = 0;
+
     while (sim_time < MAX_SIM_TIME) {
 	dut->CLK ^= 1;
 
@@ -30,48 +42,9 @@ main(int argc, char **argv, char **env)
 	if (dut->CLK == 1) {
 	    posedge_cnt++;
 
-	    switch (posedge_cnt) {
-		// 0x31
-		case 10:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '3';
-		    break;
-		case 12:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '1';
-		    break;
-		// 0x41
-		case 14:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '4';
-		    break;
-		case 16:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '1';
-		    break;
-		// 0x00
-		case 18:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-		case 20:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-		// 0x00
-		case 22:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-		case 24:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '0';
-		    break;
-
-		case 26:
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		    dut->test->dev_rx_pipe0->uart_rx0->rx_data = '\n';
-		    break;
+	    if (numLoaded < prog_size && posedge_cnt % 2) {
+		dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
+		dut->test->dev_rx_pipe0->uart_rx0->rx_data = prog[numLoaded++];
 	    }
 	}
 

@@ -5,13 +5,15 @@ package pkg_cu;
 
 typedef enum {
     CU_NOP,
-    CU_HALT,
+    CU_HALT_IMM,
+    CU_HALT_REG,
     CU_REL_JMP
 } op_t;
 
 typedef enum {
     CU_FETCH,
     CU_DECODE,
+    CU_LOAD_OPERANDS,
     CU_EXECUTE,
     CU_INCREMENT,
     CU_IDLE,

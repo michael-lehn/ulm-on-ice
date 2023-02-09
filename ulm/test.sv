@@ -24,11 +24,15 @@ module test (
     localparam baud = 9_600;
 
     logic btn1_r = 0;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic btn1_released;
+    /* verilator lint_on UNUSEDSIGNAL */
     assign btn1_released = !btn1_r && BTN1;
 
     logic btn2_r = 0;
+    /* verilator lint_off UNUSEDSIGNAL */
     logic btn2_released;
+    /* verilator lint_on UNUSEDSIGNAL */
     assign btn2_released = !btn2_r && BTN2;
 
     always @ (posedge CLK) begin

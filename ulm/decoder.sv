@@ -37,28 +37,31 @@ module decoder (
     always_ff @ (posedge clk) begin
 	if (en) begin
 	    instr_cu.op <= instr_cu_next.op;
-	    instr_cu.exit_code <= instr_cu_next.exit_code;
+	    instr_cu.exit_code_imm <= instr_cu_next.exit_code_imm;
 	    instr_cu.jmp_offset <= instr_cu_next.jmp_offset;
 	end
     end
 
     always_comb begin
 	instr_cu_next.op = pkg_cu::CU_NOP;
-	instr_cu_next.exit_code = ir[23:16];
+	instr_cu_next.exit_code_imm = ir[23:16];
 	instr_cu_next.jmp_offset = ir[23:0];
+	instr_cu_next.cu_reg0 = ir[23:20];
 
 	case (op)
 	    8'h01: // halt exit_code
-		instr_cu_next.op = pkg_cu::CU_HALT;
-	    8'h02: // jnz offset
+		instr_cu_next.op = pkg_cu::CU_HALT_IMM;
+	    8'h02: // halt %exit_code_reg
+		instr_cu_next.op = pkg_cu::CU_HALT_REG;
+	    8'h03: // jnz offset
 		instr_cu_next.op = !stat_reg_zf
 				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
-	    8'h03: // jz offset
+	    8'h04: // jz offset
 		instr_cu_next.op = stat_reg_zf
 				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
-	    8'h04: // jmp offset
+	    8'h05: // jmp offset
 		instr_cu_next.op = pkg_cu::CU_REL_JMP;
 	    default:
 		;

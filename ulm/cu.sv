@@ -24,8 +24,9 @@ module cu (
     logic [31:0] cu_ir = 0;
 
     assign halted = cu_state == pkg_cu::CU_HALTED;
-    assign tx_req = cu_state == pkg_cu::CU_EXECUTE
-		 || cu_state == pkg_cu::CU_INCREMENT;
+    assign tx_req = en
+		  && (cu_state == pkg_cu::CU_INCREMENT
+		   || cu_state == pkg_cu::CU_FETCH);
 
     //
     // Interface to current instruction
@@ -49,20 +50,26 @@ module cu (
 	    case (cu_state)
 		pkg_cu::CU_FETCH:
 		    begin
-			cu_state_next = pkg_cu::CU_DECODE;
+			if (instr_cu.op == pkg_cu::CU_HALT_IMM
+			 || instr_cu.op == pkg_cu::CU_HALT_REG)
+			begin
+			    cu_state_next = pkg_cu::CU_HALTED;
+			end
+			else begin
+			    cu_state_next = pkg_cu::CU_DECODE;
+			end
 		    end
 		pkg_cu::CU_DECODE:
+		    begin
+			cu_state_next = pkg_cu::CU_LOAD_OPERANDS;
+		    end
+		pkg_cu::CU_LOAD_OPERANDS:
 		    begin
 			cu_state_next = pkg_cu::CU_EXECUTE;
 		    end
 		pkg_cu::CU_EXECUTE:
 		    begin
-			if (instr_cu.op != pkg_cu::CU_HALT) begin
-			    cu_state_next = pkg_cu::CU_INCREMENT;
-			end
-			else begin
-			    cu_state_next = pkg_cu::CU_HALTED;
-			end
+			cu_state_next = pkg_cu::CU_INCREMENT;
 		    end
 		pkg_cu::CU_INCREMENT:
 		    begin
@@ -138,9 +145,16 @@ module cu (
     logic [pkg_ram::RAM_ADDRW-1:0] cu_ip = 0;
     logic [pkg_ram::RAM_ADDRW-1:0] cu_ip_next;
 
-    assign exit_code = instr_cu.op == pkg_cu::CU_HALT
-		     ? instr_cu.exit_code
-		     : 8'hff;
+    always_comb begin
+	exit_code = 8'hff;
+	if (instr_cu.op == pkg_cu::CU_HALT_IMM) begin
+	    exit_code = instr_cu.exit_code_imm;
+	end
+	else if (instr_cu.op == pkg_cu::CU_HALT_REG) begin
+	    exit_code = dev_reg_file.data_out0[pkg_ram::RAM_BYTE-1:0];
+	end
+    end
+
 
     always_ff @ (posedge clk) begin
 	if (en && cu_state == pkg_cu::CU_INCREMENT) begin
@@ -198,6 +212,14 @@ module cu (
 	    dev_reg_file.data_in = dev_ram.data_out;
 	end
 	else if (instr_io.op == pkg_io::IO_PUTC_REG) begin
+	    dev_reg_file.op = pkg_reg::REG_READ_ONLY;
+	    dev_reg_file.addr_out0 = instr_io.char_reg;
+	    dev_reg_file.addr_out1 = 0;
+	    dev_reg_file.addr_in = 0;
+	    dev_reg_file.data_in = 0;
+	end
+	else if (instr_cu.op == pkg_cu::CU_HALT_REG) begin
+	    dev_reg_file.op = pkg_reg::REG_READ_ONLY;
 	    dev_reg_file.addr_out0 = instr_io.char_reg;
 	    dev_reg_file.addr_out1 = 0;
 	    dev_reg_file.addr_in = 0;
@@ -229,7 +251,7 @@ module cu (
 	putc = 0;
 	putc_char = instr_io.char_imm;
 
-	case ({cu_state == pkg_cu::CU_EXECUTE, instr_io.op})
+	case ({cu_state == pkg_cu::CU_INCREMENT, instr_io.op})
 	    {1'b1, pkg_io::IO_PUTC_REG}:
 		begin
 		    putc = 1;
