@@ -8,6 +8,7 @@
 module decoder (
     input logic clk,
     input logic en,
+    input logic rst,
 
     // content of instruction register
     input logic [31:0] ir,
@@ -35,7 +36,10 @@ module decoder (
     if_instr_cu instr_cu_next();
 
     always_ff @ (posedge clk) begin
-	if (en) begin
+	if (rst) begin
+	    instr_cu.op <= pkg_cu::CU_NOP;
+	end
+	else if (en) begin
 	    instr_cu.op <= instr_cu_next.op;
 	    instr_cu.exit_code_imm <= instr_cu_next.exit_code_imm;
 	    instr_cu.jmp_offset <= instr_cu_next.jmp_offset;
@@ -74,7 +78,10 @@ module decoder (
     if_instr_alu instr_alu_next();
 
     always_ff @ (posedge clk) begin
-	if (en) begin
+	if (rst) begin
+	    instr_alu.op <= pkg_alu::ALU_NOP;
+	end
+	else if (en) begin
 	    instr_alu.op <= instr_alu_next.op;
 	    instr_alu.a_sel <= instr_alu_next.a_sel;
 	    instr_alu.s_reg <= instr_alu_next.s_reg;
@@ -132,7 +139,10 @@ module decoder (
     if_instr_bus instr_bus_next();
 
     always_ff @ (posedge clk) begin
-	if (en) begin
+	if (rst) begin
+	    instr_bus.op <= pkg_bus::BUS_NOP;
+	end
+	else if (en) begin
 	    instr_bus.op <= instr_bus_next.op;
 	    instr_bus.size <= instr_bus_next.size;
 	    instr_bus.data_reg <= instr_bus_next.data_reg;
@@ -165,7 +175,10 @@ module decoder (
     if_instr_io instr_io_next();
 
     always_ff @ (posedge clk) begin
-	if (en) begin
+	if (rst) begin
+	    instr_io.op <= pkg_io::IO_NOP;
+	end
+	else if (en) begin
 	    instr_io.op <= instr_io_next.op;
 	    instr_io.char_imm <= instr_io_next.char_imm;
 	    instr_io.char_reg <= instr_io_next.char_reg;

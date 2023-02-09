@@ -40,6 +40,15 @@ module test (
 	btn2_r <= BTN2;
     end
 
+    logic reset = 0;
+
+    always @ (posedge CLK) begin
+	reset <= 0;
+	if (btn1_released) begin
+	    reset <= 1;
+	end
+    end
+
     //
     // 7-seg display
     //
@@ -81,11 +90,13 @@ module test (
     //
 
     if_dev_ram loader_ram();
-    logic loader_rst = 0;
     logic loader_byte_valid = 0;
     logic loader_done;
     logic [pkg_ram::RAM_BYTE-1:0] loader_data_in, loader_byte;
     logic loader_push_back;
+
+    logic loader_rst;
+    assign loader_rst = reset;
 
     dev_loader loader0 (
 	.clk(CLK),
@@ -160,7 +171,9 @@ module test (
     if_dev_alu dev_alu();
 
     logic cu_en = 0;
+    logic cu_rst = 0;
     assign displ_byte = loader_done ? exit_code : loader_byte;
+    assign cu_rst = reset;
 
     always_ff @ (posedge CLK) begin
 	// print what was typed
@@ -193,6 +206,7 @@ module test (
     cu cu0(
 	.clk(CLK),
 	.en(cu_en),
+	.rst(cu_rst),
 	.dev_ram(dev_ram),
 	.dev_reg_file(dev_reg_file),
 	.dev_alu(dev_alu),

@@ -8,6 +8,7 @@
 module cu (
     input logic clk,
     input logic en,
+    input logic rst,
 
     // devices
     output if_dev_ram dev_ram,
@@ -21,7 +22,7 @@ module cu (
 );
     pkg_cu::state_t cu_state = pkg_cu::CU_FETCH;
     pkg_cu::state_t cu_state_next;
-    logic [31:0] cu_ir = 0;
+    logic [31:0] cu_ir;
 
     assign halted = cu_state == pkg_cu::CU_HALTED;
     assign tx_req = en
@@ -40,7 +41,12 @@ module cu (
     // von Neumann cycle
     //
     always_ff @ (posedge clk) begin
-	cu_state <= cu_state_next;
+	if (rst) begin
+	    cu_state <= pkg_cu::CU_FETCH;
+	end
+	else begin
+	    cu_state <= cu_state_next;
+	end
     end
 
     always_comb begin
@@ -130,6 +136,7 @@ module cu (
     
     decoder decoder0(
 	.clk(clk),
+	.rst(rst),
 	.en(decoder_en),
 	.ir(cu_ir),
 	.stat_reg_zf(dev_alu.stat_reg_zf),
@@ -157,7 +164,10 @@ module cu (
 
 
     always_ff @ (posedge clk) begin
-	if (en && cu_state == pkg_cu::CU_INCREMENT) begin
+	if (rst || cu_state == pkg_cu::CU_HALTED) begin
+	    cu_ip <= 0;
+	end
+	else if (en && cu_state == pkg_cu::CU_INCREMENT) begin
 	    cu_ip <= cu_ip_next;
 	end
     end
@@ -249,7 +259,7 @@ module cu (
     //
     always_comb begin
 	putc = 0;
-	putc_char = instr_io.char_imm;
+	putc_char = 0;
 
 	case ({cu_state == pkg_cu::CU_INCREMENT, instr_io.op})
 	    {1'b1, pkg_io::IO_PUTC_REG}:
@@ -259,6 +269,7 @@ module cu (
 		end
 	    {1'b1, pkg_io::IO_PUTC_IMM}:
 		begin
+		    putc_char = instr_io.char_imm;
 		    putc = 1;
 		end
 	    default:

@@ -14,7 +14,10 @@ module dev_loader (
     initial done = 0;
 
     always_ff @ (posedge clk) begin
-	if (data_in == 8'h04 && ram.op == pkg_ram::RAM_NOP) begin
+	if (rst) begin
+	    done <= 0;
+	end
+	else if (data_in == 8'h04 && ram.op == pkg_ram::RAM_NOP) begin
 	    done <= 1;
 	end
     end
@@ -102,6 +105,7 @@ module dev_loader (
 	ram.op <= pkg_ram::RAM_NOP;
 
 	if (rst) begin
+	    ram.addr <= 0;
 	    addr_next <= 0;
 	end
 	else if (!done && new_byte_val) begin
