@@ -29,6 +29,8 @@ module decoder (
 
     initial begin
 	instr_cu.op = pkg_cu::CU_NOP;
+	instr_cu.cu_reg0 = 0;
+	instr_cu.cu_reg1 = 1;
     end
 
     //
