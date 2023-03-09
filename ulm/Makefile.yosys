@@ -30,7 +30,7 @@ prog := iceprog
 all: $(vProject.bin)
 
 $(vSource) : $(svSource)
-	sv2v --define=SYNTHESIS --write=$@ $^
+	sv2v -v --define=SYNTHESIS --write=$@ $^
 
 $(vProject.json) : $(vSource)
 	$(synTool) $(synTool.flags) $(vSource)

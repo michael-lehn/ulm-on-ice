@@ -12,11 +12,11 @@
 #define MAX_SIM_TIME 700 
 
 unsigned char prog[] = {
-    '1', '0', '1', '0', '0', '0', '1', '0', '2', '0', '2', '1', '0', '0',
-    '0', '0', '3', '0', '2', '0', '0', '0', '0', '0', '0', '1', '0', '4',
-    '0', '0', '0', '0', '4', '8', '0', '0', '0', '0', '0', '0',
+    '3', '2', '1', '0', '0', '0', '0', '0', 
+    '1', '2', '1', '1', '0', '0', '0', '1', 
+    '3', '0', '1', '0', '0', '0', '0', '0', 
+    '0', '5', 'F', 'F', 'F', 'F', 'F', 'D', 
     0x04,
-    
 };
 
 constexpr std::size_t prog_size = sizeof prog / sizeof prog[0];
@@ -35,12 +35,15 @@ main(int argc, char **argv, char **env)
     std::uint64_t posedge_cnt = 0;
     std::uint64_t numLoaded = 0;
 
+    std::size_t numCh = 0;
+
     while (sim_time < MAX_SIM_TIME) {
 	dut->CLK ^= 1;
 
 	if (dut->CLK == 1) {
 	    posedge_cnt++;
 
+	    /*
 	    if (dut->BTN1) {
 		dut->BTN1 = 0;
 	    }
@@ -48,14 +51,22 @@ main(int argc, char **argv, char **env)
 		dut->BTN1 = 1;
 		numLoaded = 0;
 	    }
+	    */
 	}
 
 	dut->eval();
 
 	if (dut->CLK == 1) {
-	    if (numLoaded < prog_size && posedge_cnt % 2) {
-		dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
-		dut->test->dev_rx_pipe0->uart_rx0->rx_data = prog[numLoaded++];
+	    if (posedge_cnt % 2) {
+		if (numLoaded < prog_size) {
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data
+			= prog[numLoaded++];
+		} else if (numCh < 10) {
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_ready = 1;
+		    dut->test->dev_rx_pipe0->uart_rx0->rx_data
+			= 'A' + numCh++;
+		}
 	    }
 	}
 

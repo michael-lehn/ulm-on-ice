@@ -58,7 +58,7 @@ module test (
     logic [6:0] seg_pins;
     logic       digit_sel;
 
-    logic [7:0] displ_byte;
+    logic [pkg_ram::RAM_BYTE-1:0] displ_byte;
 
     dev_hex dev_hex0 (
 	.clk(CLK),
@@ -159,12 +159,28 @@ module test (
     */
 
     //
+    // Input buffer
+    //
+    logic inbuf_rst;
+    if_fifo_in inbuf_in();
+    if_fifo_out inbuf_out();
+
+    initial begin
+	inbuf_in.push_back = 0;
+	inbuf_out.pop_front = 0;
+    end
+
+    always_comb begin
+	inbuf_rst = reset;
+    end
+
+    //
     // CPU consistes of control unit and devices
     //
 
     //-- CU (Control unit) -----------------------------------------------------
     logic putc;
-    logic [7:0] putc_char, exit_code;
+    logic [pkg_ram::RAM_BYTE-1:0] putc_char, exit_code;
 
     if_dev_reg_file dev_reg_file();
     if_dev_ram dev_ram();
@@ -185,12 +201,18 @@ module test (
 	tx_pipe.push_back <= putc && !tx_pipe.push_back
 			  && !tx_pipe.full;
 
-	tx_pipe_loader.data_in <= rx_pipe.data_out;
-	tx_pipe_loader.push_back <= rx_pipe.pop_front && !tx_pipe.push_back
-			         && !tx_pipe_loader.full;
+	//if (!loader_done) begin
+	    tx_pipe_loader.data_in <= rx_pipe.data_out;
+	    tx_pipe_loader.push_back <= rx_pipe.pop_front && !tx_pipe.push_back
+	    		         && !tx_pipe_loader.full;
 
-	loader_push_back <= rx_pipe.pop_front;
-	loader_data_in <= rx_pipe.data_out;
+	    loader_push_back <= rx_pipe.pop_front;
+	    loader_data_in <= rx_pipe.data_out;
+	//end
+	//else begin
+	//    inbuf_in.push_back <= rx_pipe.pop_front;
+	//    inbuf_in.data_in <= rx_pipe.data_out;
+	//end
 
     end
 
@@ -210,6 +232,7 @@ module test (
 	.dev_ram(dev_ram),
 	.dev_reg_file(dev_reg_file),
 	.dev_alu(dev_alu),
+	.inbuf(inbuf_out),
 	.putc(putc),
 	.putc_char(putc_char),
 	.halted(halted),
@@ -305,6 +328,17 @@ module test (
 	.clk(CLK),
 	.rx_pipe(rx_pipe),
 	.rx(RX)
+    );
+
+    fifo inbuf0(
+	.clk(CLK),
+	.rst(inbuf_rst),
+	.push_back(inbuf_in.push_back),
+	.data_in(inbuf_in.data_in),
+	.full(inbuf_in.full),
+	.pop_front(inbuf_out.pop_front),
+	.data_out(inbuf_out.data_out),
+	.empty(inbuf_out.empty)
     );
 
 

@@ -15,6 +15,7 @@ module decoder (
 
     // status register
     input logic stat_reg_zf,
+    input logic stat_reg_cf,
 
     // decoded instruction
     output if_instr_cu instr_cu,
@@ -43,6 +44,8 @@ module decoder (
 	    instr_cu.op <= instr_cu_next.op;
 	    instr_cu.exit_code_imm <= instr_cu_next.exit_code_imm;
 	    instr_cu.jmp_offset <= instr_cu_next.jmp_offset;
+	    instr_cu.cu_reg0 <= instr_cu_next.cu_reg0;
+	    instr_cu.cu_reg1 <= instr_cu_next.cu_reg1;
 	end
     end
 
@@ -51,6 +54,7 @@ module decoder (
 	instr_cu_next.exit_code_imm = ir[23:16];
 	instr_cu_next.jmp_offset = ir[23:0];
 	instr_cu_next.cu_reg0 = ir[23:20];
+	instr_cu_next.cu_reg1 = ir[19:16];
 
 	case (op)
 	    8'h01: // halt exit_code
@@ -67,6 +71,12 @@ module decoder (
 				 : pkg_cu::CU_NOP;
 	    8'h05: // jmp offset
 		instr_cu_next.op = pkg_cu::CU_REL_JMP;
+	    8'h06: // jb offset
+		instr_cu_next.op = stat_reg_cf
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h07: // jmp %func, %ret
+		instr_cu_next.op = pkg_cu::CU_ABS_JMP;
 	    default:
 		;
 	endcase
@@ -159,9 +169,14 @@ module decoder (
 	instr_bus_next.addr_offset = {1'b0, ir[15:0]};
 
 	case (op)
-	    8'h20: // movzbq offset(%addr), %data
+	    8'h20: // movzbq (%addr), %data
 		begin
 		    instr_bus_next.op = pkg_bus::BUS_FETCH;
+		    instr_bus_next.size = pkg_ram::RAM_BYTE;
+		end
+	    8'h21: // movb %data, (%addr)
+		begin
+		    instr_bus_next.op = pkg_bus::BUS_STORE;
 		    instr_bus_next.size = pkg_ram::RAM_BYTE;
 		end
 	    default:
@@ -192,10 +207,12 @@ module decoder (
 	instr_io_next.op = pkg_io::IO_NOP;
 
 	case (op)
-	    8'h30: // putc %X
+	    8'h30: // putc %x
 		instr_io_next.op = pkg_io::IO_PUTC_REG;
-	    8'h31: // putc X
+	    8'h31: // putc x
 		instr_io_next.op = pkg_io::IO_PUTC_IMM;
+	    8'h32: // getc %x
+		instr_io_next.op = pkg_io::IO_GETC;
 	    default:
 	    ;
 	endcase

@@ -14,6 +14,7 @@ module cu (
     output if_dev_ram dev_ram,
     output if_dev_reg_file dev_reg_file,
     output if_dev_alu dev_alu,
+    input if_fifo_out inbuf,
     output logic putc,
     output logic [pkg_ram::RAM_BYTE-1:0] putc_char,
     output logic halted,
@@ -71,7 +72,10 @@ module cu (
 		    end
 		pkg_cu::CU_LOAD_OPERANDS:
 		    begin
-			cu_state_next = pkg_cu::CU_EXECUTE;
+			if (instr_io.op != pkg_io::IO_GETC || !inbuf.empty)
+			begin
+			    cu_state_next = pkg_cu::CU_EXECUTE;
+			end
 		    end
 		pkg_cu::CU_EXECUTE:
 		    begin
@@ -140,6 +144,7 @@ module cu (
 	.en(decoder_en),
 	.ir(cu_ir),
 	.stat_reg_zf(dev_alu.stat_reg_zf),
+	.stat_reg_cf(dev_alu.stat_reg_cf),
 	.instr_cu(instr_cu),
 	.instr_io(instr_io),
 	.instr_alu(instr_alu),
@@ -150,7 +155,7 @@ module cu (
     // control cu instructions (jump and halt)
     //
     logic [pkg_ram::RAM_ADDRW-1:0] cu_ip = 0;
-    logic [pkg_ram::RAM_ADDRW-1:0] cu_ip_next;
+    logic [pkg_ram::RAM_ADDRW-1:0] cu_ip_next, cu_ip_ret;
 
     always_comb begin
 	exit_code = 8'hff;
@@ -162,7 +167,6 @@ module cu (
 	end
     end
 
-
     always_ff @ (posedge clk) begin
 	if (rst || cu_state == pkg_cu::CU_HALTED) begin
 	    cu_ip <= 0;
@@ -173,15 +177,20 @@ module cu (
     end
 
     always_comb begin
+	cu_ip_ret = cu_ip + 4;
 	cu_ip_next = cu_ip + 4;
 
-	case (instr_cu.op)
-	    pkg_cu::CU_REL_JMP:
-		cu_ip_next = cu_ip
-			   + 4 * instr_cu.jmp_offset[pkg_ram::RAM_ADDRW-1:0];
-	    default:
-		;
-	endcase
+	if (cu_state == pkg_cu::CU_INCREMENT) begin
+	    case (instr_cu.op)
+		pkg_cu::CU_REL_JMP:
+		    cu_ip_next = cu_ip
+			       + 4 * instr_cu.jmp_offset[pkg_ram::RAM_ADDRW-1:0];
+		pkg_cu::CU_ABS_JMP:
+		    cu_ip_next = dev_reg_file.data_out0[pkg_ram::RAM_ADDRW-1:0];
+		default:
+		    ;
+	    endcase
+	end
     end
 
     //
@@ -191,12 +200,19 @@ module cu (
 	instr_ram.size = instr_bus.size;
 	instr_ram.addr = dev_reg_file.data_out0[pkg_ram::RAM_ADDRW-1:0]
 		       + instr_bus.addr_offset;
-	instr_ram.data_in = 0;
 	instr_ram.op = pkg_ram::RAM_NOP;
+	instr_ram.data_in = 0;
 
 	case (instr_bus.op)
 	    pkg_bus::BUS_FETCH:
-		instr_ram.op = pkg_ram::RAM_FETCH;
+		begin
+		    instr_ram.op = pkg_ram::RAM_FETCH;
+		end
+	    pkg_bus::BUS_STORE:
+		begin
+		    instr_ram.data_in = dev_reg_file.data_out1;
+		    instr_ram.op = pkg_ram::RAM_STORE;
+		end
 	    default:
 		;
 	endcase
@@ -221,6 +237,12 @@ module cu (
 	    dev_reg_file.addr_in = instr_bus.data_reg;
 	    dev_reg_file.data_in = dev_ram.data_out;
 	end
+	else if (instr_bus.op == pkg_bus::BUS_STORE) begin
+	    dev_reg_file.addr_out0 = instr_bus.addr_reg;
+	    dev_reg_file.addr_out1 = instr_bus.data_reg;
+	    dev_reg_file.addr_in = 0;
+	    dev_reg_file.data_in = 0;
+	end
 	else if (instr_io.op == pkg_io::IO_PUTC_REG) begin
 	    dev_reg_file.op = pkg_reg::REG_READ_ONLY;
 	    dev_reg_file.addr_out0 = instr_io.char_reg;
@@ -228,12 +250,30 @@ module cu (
 	    dev_reg_file.addr_in = 0;
 	    dev_reg_file.data_in = 0;
 	end
+	else if (instr_io.op == pkg_io::IO_GETC) begin
+	    dev_reg_file.addr_out0 = 0;
+	    dev_reg_file.addr_out1 = 0;
+	    dev_reg_file.addr_in = instr_io.char_reg;
+	    dev_reg_file.data_in = {
+		{pkg_ram::RAM_QUAD - pkg_ram::RAM_BYTE{1'b0}},
+		inbuf.data_out
+	    };
+	end
 	else if (instr_cu.op == pkg_cu::CU_HALT_REG) begin
 	    dev_reg_file.op = pkg_reg::REG_READ_ONLY;
 	    dev_reg_file.addr_out0 = instr_io.char_reg;
 	    dev_reg_file.addr_out1 = 0;
 	    dev_reg_file.addr_in = 0;
 	    dev_reg_file.data_in = 0;
+	end
+	else if (instr_cu.op == pkg_cu::CU_ABS_JMP) begin
+	    dev_reg_file.addr_out0 = instr_cu.cu_reg0;
+	    dev_reg_file.addr_out1 = 0;
+	    dev_reg_file.addr_in = instr_cu.cu_reg1;
+	    dev_reg_file.data_in = {
+		{pkg_ram::RAM_QUAD - pkg_ram::RAM_ADDRW{1'b0}},
+		cu_ip_ret
+	    };
 	end
     end
 
@@ -275,6 +315,14 @@ module cu (
 	    default:
 		;
 	endcase
+    end
+
+    always_ff @ (posedge clk) begin
+	inbuf.pop_front <= 0;
+	if (cu_state == pkg_cu::CU_INCREMENT && instr_io.op == pkg_io::IO_GETC)
+	begin
+	    inbuf.pop_front <= en;
+	end
     end
 
 endmodule

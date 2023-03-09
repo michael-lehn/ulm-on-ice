@@ -4,10 +4,11 @@
 package pkg_cu;
 
 typedef enum {
-    CU_NOP,
     CU_HALT_IMM,
     CU_HALT_REG,
-    CU_REL_JMP
+    CU_REL_JMP,
+    CU_ABS_JMP,
+    CU_NOP
 } op_t;
 
 typedef enum {
