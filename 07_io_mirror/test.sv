@@ -22,7 +22,6 @@ module test (
 	IO_STARTED_TRANSMISSION
     } state_t;
 
-
     state_t state = IO_READY_TO_RECEIVE, next_state;
 
     //
@@ -109,8 +108,5 @@ module test (
 	.tx(TX),
 	.tx_busy(tx_busy)
     );
-
-
-
 
 endmodule

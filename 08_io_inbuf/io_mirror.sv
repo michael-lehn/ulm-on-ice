@@ -131,7 +131,4 @@ module io_mirror (
 	.tx_busy(tx_busy)
     );
 
-
-
-
 endmodule
