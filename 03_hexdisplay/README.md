@@ -1,6 +1,7 @@
 ## Purpose
 
-Counter gets incremented after one seconds.
+Counter with 8 bits gets incremented after one second. Value gets displayed on
+the hex display.
 
 ### Visualization of the design
 
