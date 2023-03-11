@@ -1,4 +1,4 @@
-## Purpose
+# Purpose
 
 File `test.sv` is a simple example for using an `always_comb` block. On the
 FPGA the logic described here will be realized by connecting LUTs (Lookup
