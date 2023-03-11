@@ -35,14 +35,16 @@ i.e. the physical realization with LUTs. I think this would allow to develop a
 better understanding (some guts feeling) for timing issues in more complex
 design.
 
-### Simulation with Verilog
+### Simulation with Verilator
 
 With a plain `make` the `SystemVerilog` code first gets translated to `Verilog`
 code (using `sv2v`). By that eventual syntax errors and some semantic errors
-can be detected. This creates `test.v` if no error. The simulation gets created
-from `test.v` and `tb_test.cpp`. In this step plenty semantic errors might be
-detected. If no error was detected the simulation is executed.
+can be detected. This creates `test.v` if no error was detected.
 
-With `make waves` the simulation is executed and results visualized with
+The simulation gets created with `Verilator` from `test.v` and `tb_test.cpp`.
+In this step plenty semantic errors might be detected. If no error was detected
+the simulation is executed.
+
+With `make waves` the simulation is executed and results get visualized with
 `gtkwaves`.
 
