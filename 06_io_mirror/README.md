@@ -8,4 +8,4 @@ copied to `$HOME/bin`.
 
 ### Demo on FPGA (Link to YouTube)
 
-[<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/06_io_mirror/demo.png" width="200">](https://youtu.be/2-rXkPqvtxI)
+[<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/06_io_mirror/demo.png" width="200">](https://youtu.be/mC683P6qHus)
