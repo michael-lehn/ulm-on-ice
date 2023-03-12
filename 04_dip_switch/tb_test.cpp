@@ -30,22 +30,31 @@ main(int argc, char **argv, char **env)
 	if (dut->CLK == 1) {
 	    posedge_cnt++;
 
+	    dut->B0 = 0;
+	    dut->B1 = 0;
+	    dut->B2 = 0;
+	    dut->B3 = 0;
+	    dut->B4 = 0;
+	    dut->B5 = 0;
+	    dut->B6 = 0;
+	    dut->B7 = 0;
 	    switch (posedge_cnt) {
 		case 5:
+		    dut->B0 = 1;
+		    dut->B1 = 1;
 		    dut->BTN1 = 1;
-		    dut->BTN2 = 0;
 		    break;
 		case 8:
+		    dut->B1 = 1;
 		    dut->BTN1 = 1;
-		    dut->BTN2 = 1;
 		    break;
 		case 11:
+		    dut->B0 = 1;
+		    dut->B7 = 1;
 		    dut->BTN1 = 0;
-		    dut->BTN2 = 1;
 		    break;
 		default:
 		    dut->BTN1 = 0;
-		    dut->BTN2 = 0;
 	    }
 	}
 	dut->eval();
