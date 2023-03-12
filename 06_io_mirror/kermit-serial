@@ -1,0 +1,14 @@
+#!/usr/bin/env kermit +
+;
+; Based on: https://gist.github.com/ajc/789214
+;
+; copy this to ~/bin/kermit-serial and make executable!
+
+set carrier-watch off
+set line /dev/tty.usbserial-ibj0a3QC1
+set terminal cr-display crlf
+set terminal lf-display crlf
+set speed 9600
+set stop-bits 2
+
+connect
