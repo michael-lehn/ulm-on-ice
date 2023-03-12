@@ -1,8 +1,16 @@
 module test (
     input logic CLK,
     input logic RX,
-    output logic TX
-);
+    output logic TX,
+    output logic A0,
+    output logic A1,
+    output logic A2,
+    output logic A3,
+    output logic A4,
+    output logic A5,
+    output logic A6,
+    output logic A7
+ );
 
     logic rx_ready;
     logic [7:0] rx_data_out;
@@ -107,6 +115,18 @@ module test (
 	.tx_data(tx_data_in),
 	.tx(TX),
 	.tx_busy(tx_busy)
+    );
+
+    logic [7:0] hex_out;
+    assign {A7, A6, A5, A4, A3, A2, A1, A0} = hex_out;
+
+    logic [7:0] hex_val;
+    assign hex_val = data_buf;
+
+    dev_hex dev_hex0 (
+	.clk(CLK),
+	.hex_val(hex_val),
+	.hex_pins(hex_out)
     );
 
 endmodule
