@@ -35,7 +35,7 @@ module test (
     always_ff @ (posedge BTN1) begin
 	case (op)
 	    2'b00: register[z] <= { 4'h0, x, y};
-	    2'b01: register[z] <= { x, y, 4'h0};
+	    2'b01: register[z] <= { x, y, register[z][3:0]};
 	    2'b10: register[z] <= register[y] + register[x];
 	    2'b11: register[z] <= register[y] - register[x];
 	    default:
