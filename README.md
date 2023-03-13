@@ -1,9 +1,11 @@
-# icebreaker-examples
+# Pupose
 
-My playground for the [iCEBreaker FPGA](https://1bitsquared.com/products/icebreaker)
+Provide an additional target for the compiler class project in 
+[HPC0](https://www.mathematik.uni-ulm.de/numerik/hpc/ss22/hpc0/index.html)
+next semester.
 
-Code in the examples is based on
+# What is ULM on ICE?
 
-- [icebreaker examples](https://github.com/icebreaker-fpga/icebreaker-verilog-examples),
-- [ice40 ultraplus examples](https://github.com/damdoy/ice40_ultraplus_examples),
-- [Project F](https://github.com/projf/projf-explore/tree/main/demos/sinescroll).
+It is a simple implementation of the ULM (Ulm Lecture Machine) on a
+[iCEBreaker FPGA](https://1bitsquared.com/products/icebreaker). 
+
