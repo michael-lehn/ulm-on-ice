@@ -15,7 +15,8 @@ module test (
     output logic LED1,	// inbuf is empty
     output logic LED2,	// inbuf is full
     output logic LED3,	// loader done
-    output logic LED4	// cpu halted
+    output logic LED4,	// cpu halted
+    input BTN1		// reset
 );
     // ---------
     // device: hex display
@@ -37,7 +38,7 @@ module test (
     localparam CLK_FREQ = 12_000_000;
     localparam BAUD = 9_600;
 
-    logic rst = 0;
+    logic rst = BTN1;
 
     if_io io();
 

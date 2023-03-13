@@ -1,5 +1,6 @@
 module dev_hex (
     input logic clk,
+    input logic en,
     input [7:0] hex_val,
     output [7:0] hex_pins
 );
@@ -15,24 +16,29 @@ module dev_hex (
    logic [2:0]	    display_state = counter[2 +: 3];
 
     always @(posedge clk) begin
-	counter <= counter + 1;
+	if (!en) begin
+	    seg_pins <= ~0;
+	end
+	else begin
+	    counter <= counter + 1;
 
-	// Switch seg_pins_n off during digit_sel transitions
-	// to prevent flicker.  Each digit has 25% duty cycle.
-	case (display_state)
-	    0, 1:
-		seg_pins <= segments;
-	    2:
-		seg_pins <= ~0;
-	    3:
-		digit_sel <= 0;
-	    4, 5:
-		seg_pins <= segments;
-	    6:
-		seg_pins <= ~0;
-	    7:
-		digit_sel <= 1;
-	endcase
+	    // Switch seg_pins_n off during digit_sel transitions
+	    // to prevent flicker.  Each digit has 25% duty cycle.
+	    case (display_state)
+		0, 1:
+		    seg_pins <= segments;
+		2:
+		    seg_pins <= ~0;
+		3:
+		    digit_sel <= 0;
+		4, 5:
+		    seg_pins <= segments;
+		6:
+		    seg_pins <= ~0;
+		7:
+		    digit_sel <= 1;
+	    endcase
+	end
     end
 
     logic [6:0] segments;
