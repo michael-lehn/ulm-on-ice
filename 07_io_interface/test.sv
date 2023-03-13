@@ -4,7 +4,8 @@ module test (
     input logic BTN1,
     input logic BTN2,
     output logic TX,
-    output  logic [7:0] PMOD_1A,
+    output logic [7:0] PMOD_1A,
+    input logic [7:0] PMOD_1B,
     output LED1,
     output LED2,
     output LED3
@@ -44,9 +45,9 @@ module test (
 
     // ---------
     
-    assign LED1 = BTN1 && !if_io.getc_en; // error: can't pop from empty inbuf
-    assign LED2 = !if_io.getc_en;	  // inbuf is empty
-    assign LED3 = if_io.inbuf_full;	  // inbuf is full
+    assign LED1 = !if_io.getc_en;	  // inbuf is empty
+    assign LED2 = if_io.inbuf_full;	  // inbuf is full
+    assign LED3 = BTN1 && !if_io.getc_en; // error: can't pop from empty inbuf
 
     // ---------
 
@@ -68,8 +69,18 @@ module test (
 
     initial begin
 	if_io.putc_push = 0;
-	if_io.putc_char = "A";
     end
+
+    assign if_io.putc_char = {
+	PMOD_1B[0],
+	PMOD_1B[1],
+	PMOD_1B[2],
+	PMOD_1B[3],
+	PMOD_1B[4],
+	PMOD_1B[5],
+	PMOD_1B[6],
+	PMOD_1B[7]
+    };
 
     logic [31:0] btn2 = 0;
     always_ff @ (posedge CLK) begin
@@ -78,10 +89,6 @@ module test (
 	if_io.putc_push <= 0;
 	if (!btn2[0] && btn2[1]) begin
 	    if_io.putc_push <= 1;
-	end
-
-	if (if_io.putc_push_done) begin
-	    if_io.putc_char <= if_io.putc_char + 1;
 	end
     end
 
