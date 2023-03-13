@@ -19,4 +19,4 @@ expect to find here good practise examples.
 
 ## Some demo
 
-Have a look at `09_ulm_on_ice/README.md`.
+Have a look at [09_ulm_on_ice/README.md](https://github.com/michael-lehn/icebreaker-examples/blob/main/09_ulm_on_ice/README.md)
