@@ -17,6 +17,6 @@ first encounter with `Verilog` and `SystemVerilog` and the world of FPGAs. This
 is the result after one and a half month brutal trial and error. So don't
 expect to find here good practise examples. 
 
-### Demo on FPGA (Link to YouTube)
+## Demo on FPGA (Link to YouTube)
 
 [<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/09_ulm_on_ice/demo.png" width="200">](https://youtu.be/jYW8OXb68nw)
