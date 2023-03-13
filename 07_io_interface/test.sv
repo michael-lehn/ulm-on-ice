@@ -39,6 +39,7 @@ module test (
 
     dev_hex dev_hex0(
 	.clk(CLK),
+	.en(1'b1),
 	.hex_val(hex_val),
 	.hex_pins(hex_pins)
     );

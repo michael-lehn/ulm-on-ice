@@ -23,7 +23,7 @@ MODULE.json := $(MODULE).json
 MODULE.asc := $(MODULE).asc
 MODULE.bin := $(MODULE).bin
 
-pcf := ../icebreaker_mod.pcf
+pcf := ../icebreaker.pcf
 synTool := yosys
 synTool.flags := \
     	-ql $(MODULE.log) \

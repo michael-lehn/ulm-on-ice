@@ -1,1 +1,1 @@
-../04_dip_switch/dev_hex.sv
+../03_hexdisplay/dev_hex.sv

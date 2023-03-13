@@ -1,1 +1,0 @@
-../08_dev_loader/quad_we_mask.sv
