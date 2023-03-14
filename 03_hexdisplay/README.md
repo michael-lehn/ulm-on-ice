@@ -7,6 +7,6 @@ the hex display.
 
 ![test](https://github.com/michael-lehn/icebreaker-examples/blob/main/03_hexdisplay/test.svg)
 
-### Demo on FPGA (Link to YouTube)
+### Demo (Link to YouTube)
 
 [<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/03_hexdisplay/demo.png" width="200">](https://youtu.be/ml9ckLZRTu0)

@@ -1,6 +1,7 @@
 ## Purpose
 
-Simple ULM implementation on a Lattice iCE40UP5k FPGA
+Some example program you can execute on ULM-on-iCE. Simply copy and paste the
+hex code as shown in the demo
 
 ### Demo (Link to YouTube)
 

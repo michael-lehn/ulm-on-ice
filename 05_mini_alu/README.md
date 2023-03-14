@@ -11,6 +11,6 @@ Just four operations are supported:
 - Add a register to a register and store the result in a register.
 - Subtract a register from a register and store the result in a register.
 
-### Demo on FPGA (Link to YouTube)
+### Demo (Link to YouTube)
 
 [<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/05_mini_alu/demo.png" width="200">](https://youtu.be/ZdcFZW_OYYg)

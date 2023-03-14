@@ -6,6 +6,6 @@ you have typed in. In addition the Hex display shows the last byte that was
 received by the FPGA. The repository contains `kermit-serial` which I have
 copied to `$HOME/bin`. 
 
-### Demo on FPGA (Link to YouTube)
+### Demo (Link to YouTube)
 
 [<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/06_io_mirror/demo.png" width="200">](https://youtu.be/mC683P6qHus)

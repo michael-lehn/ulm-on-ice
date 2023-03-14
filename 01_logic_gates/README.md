@@ -6,7 +6,7 @@ tables).  These LUTs are multiplexers with 4 control bits and one output
 (correct me if I am wrong).  Hence they can be used to realize boolean
 functions of the form $f: \\{0,1\\}^4 \to \\{0,1\\}$.
 
-### Demo on FPGA (Link to YouTube)
+### Demo (Link to YouTube)
 
 With `make synth` the design gets synthesized, and with `make prog` synthesized
 and the FPGA programmed:
