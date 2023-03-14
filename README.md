@@ -18,7 +18,7 @@ is the result after one and a half month brutal trial and error. So don't
 expect to find here good practise examples.
 
 Here some links to sites that help me to get started:
-- [Project f](https://projectf.io)
+- [Project F](https://projectf.io)
 - [Verilator introduction](https://itsembedded.com/dhd/verilator_1/)
 - [SystemVerilog tutorial](https://www.chipverify.com/systemverilog/systemverilog-tutorial)
 - ... I will extend and comment this list ...
