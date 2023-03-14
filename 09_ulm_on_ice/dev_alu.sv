@@ -6,6 +6,11 @@ module dev_alu #(
     input logic clk,
     input if_alu.server alu
 );
+    logic [31:0] prod;
+    logic [15:0] a0, b0;
+    assign a0 = alu.a[15:0];
+    assign b0 = alu.b[15:0];
+    assign prod = a0 * b0;
     
     logic [WIDTH-1:0] res;
     logic [WIDTH-1:0] acc = 0;
@@ -23,6 +28,14 @@ module dev_alu #(
 		{cf_res, res} = alu.b + alu.a;
 	    pkg_alu::ALU_SUB:
 		{cf_res, res} = alu.b - alu.a;
+	    pkg_alu::ALU_AND:
+		{cf_res, res} = {1'b0, alu.b & alu.a};
+	    pkg_alu::ALU_SHR:
+		{cf_res, res} = {1'b0, alu.b >> alu.a};
+	    pkg_alu::ALU_SHL:
+		{cf_res, res} = {1'b0, alu.b << alu.a};
+	    pkg_alu::ALU_MULW:
+		{cf_res, res} = {1'b0, {WIDTH-32{1'b0}}, prod};
 	    default:
 		{cf_res, res} = 0;
 	endcase

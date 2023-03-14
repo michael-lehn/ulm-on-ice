@@ -1,7 +1,8 @@
 ## Purpose
 
 Some example program you can execute on ULM-on-iCE. Simply copy and paste the
-hex code as shown in the demo
+hex code as shown in the demo. Main purpose of course is testing the
+instruction set with simple examples.
 
 ### Demo (Link to YouTube)
 

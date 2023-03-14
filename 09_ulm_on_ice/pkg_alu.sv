@@ -6,7 +6,11 @@ package pkg_alu;
 typedef enum {
     ALU_NOP,
     ALU_ADD,
-    ALU_SUB
+    ALU_SUB,
+    ALU_AND,
+    ALU_SHR,
+    ALU_SHL,
+    ALU_MULW
 } op_t;
 
 typedef enum {

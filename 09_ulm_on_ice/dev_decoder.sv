@@ -76,6 +76,18 @@ module dev_decoder (
 				 : pkg_cu::CU_NOP;
 	    8'h07: // jmp %func, %ret
 		instr_cu_next.op = pkg_cu::CU_ABS_JMP;
+	    8'h08: // jbe offset
+		instr_cu_next.op = alu.zf || alu.cf
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h09: // ja offset
+		instr_cu_next.op = !alu.zf && !alu.cf
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h0A: // ja offset
+		instr_cu_next.op = !alu.cf
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
 	    default:
 		;
 	endcase
@@ -163,11 +175,28 @@ module dev_decoder (
 	    8'h13: // subq %a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SUB;
-		    instr_alu_next.s_reg = ir[23:20];
 		end
 	    8'h14: // subq a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SUB;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h15: // mulw %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_MULW;
+		end
+	    8'h16: // andq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_AND;
+		end
+	    8'h17: // shrq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHR;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h18: // shlq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHL;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
 		end
 	    default:
