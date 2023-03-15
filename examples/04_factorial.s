@@ -18,12 +18,15 @@
                                             # variables are needed
 
 	.data
-msg0:	.string "Type in some unsigned integer in decimal format\n\n"
-msg1:   .string "again? (type 'n' to exit, any other key to continue)\n"
-msg2:   .string "Tschüss!\n"
+msg0:	.string "Type in some unsigned integer n in decimal format\n"
+msg1:	.string "The program will compute n! with 64-bit arithmetic.\n"
+msg2:	.string "Note: 20! is the largest value that can be stored in 64 bits\n"
+
+msg3:   .string "again? (type 'n' to exit, any other key to continue)\n"
+msg4:   .string "Tschüss!\n"
 
 neq:	.string "n = "
-got:	.string "got: n = "
+nfeq:	.string "! = "
 
         .text
 #
@@ -32,8 +35,8 @@ got:	.string "got: n = "
         load    0,          %SP
         movq    %SP,        %FP
 
-        // reserve space for 2 local variables
-        subq    2 * 8,      %SP,        %SP
+        // reserve space for 1 local variable
+        subq    1 * 8,      %SP,        %SP
 
         // call puts(msg0)
         subq    4 * 8,      %SP,        %SP
@@ -42,6 +45,23 @@ got:	.string "got: n = "
         load    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
+
+        // call puts(msg1)
+        subq    4 * 8,      %SP,        %SP
+        load    msg1,        %4
+        movq    %4,         fparam0(%SP)
+        load    puts,       %4
+        call    %4,         %RET_ADDR
+        addq    4 * 8,      %SP,        %SP
+
+        // call puts(msg2)
+        subq    4 * 8,      %SP,        %SP
+        load    msg2,        %4
+        movq    %4,         fparam0(%SP)
+        load    puts,       %4
+        call    %4,         %RET_ADDR
+        addq    4 * 8,      %SP,        %SP
+
 
 .loop:
         // call puts(neq)
@@ -60,13 +80,32 @@ got:	.string "got: n = "
 	movq	%4,	    local0(%FP)
         addq    3 * 8,      %SP,        %SP
 
-        // call puts(got)
+        // call putu(local0)
         subq    4 * 8,      %SP,        %SP
-        load    got,        %4
+	movq	local0(%FP),%4
+        movq    %4,         fparam0(%SP)
+        load    putu,      %4
+        call    %4,         %RET_ADDR
+        addq    4 * 8,      %SP,        %SP
+
+        // call puts(nfeq)
+        subq    4 * 8,      %SP,        %SP
+        load    nfeq,       %4
         movq    %4,         fparam0(%SP)
         load    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
+
+        // call local0 = factorial(local0)
+        subq    4 * 8,      %SP,        %SP
+	movq	local0(%FP),%4
+        movq    %4,         fparam0(%SP)
+        load    factorial,  %4
+        call    %4,         %RET_ADDR
+	movq	rval(%SP),  %4
+	movq	%4,	    local0(%FP)
+        addq    4 * 8,      %SP,        %SP
+
 
         // call putu(local0)
         subq    4 * 8,      %SP,        %SP
@@ -78,9 +117,9 @@ got:	.string "got: n = "
 
 	putc	'\n'
 
-        // call puts(msg1)
+        // call puts(msg3)
         subq    4 * 8,      %SP,        %SP
-        load    msg1,        %4
+        load    msg3,        %4
         movq    %4,         fparam0(%SP)
         load    puts,       %4
         call    %4,         %RET_ADDR
@@ -90,18 +129,68 @@ got:	.string "got: n = "
         subq    'n',        %4,         %0
         jnz     .loop
 
-	// call puts(msg2)
+	// call puts(msg4)
         subq    4 * 8,      %SP,        %SP
-        load    msg2,        %4
+        load    msg4,        %4
         movq    %4,         fparam0(%SP)
         load    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-
-
-
 	halt	0
+
+/*
+        uint64_t getu
+*/
+factorial:
+        // function prologue
+        movq    %RET_ADDR,  ret(%SP)
+        movq    %FP,        fp(%SP)
+        movq    %SP,        %FP
+
+	// reserve space for 2 local variables 'local0'
+        subq    1 * 8,      %SP,        %SP
+
+        /* begin of the function body */
+
+	load	1,	    %4
+	movq	%4,	    local0(%FP)
+
+.loop.factorial:
+	movq	fparam0(%FP),%5
+	subq	0,	    %5,		%0
+	jz	.leave.factorial
+
+	//	local0 = local0 * n;
+        subq    5 * 8,      %SP,        %SP
+	movq	local0(%FP),%4
+        movq    %4,         fparam0(%SP)
+	movq	fparam0(%FP),%4
+        movq    %4,         fparam1(%SP)
+        load    imulq,      %4
+        call    %4,         %RET_ADDR
+	movq	rval(%SP),  %4
+	movq	%4,	    local0(%FP)
+        addq    5 * 8,      %SP,        %SP
+
+	//	n = n - 1;
+	movq	fparam0(%FP),%4
+	subq	1,	    %4,		%4
+	movq	%4,	    fparam0(%FP)
+	jmp	.loop.factorial
+
+.leave.factorial:
+	movq	local0(%FP),%4
+	movq	%4,	    rval(%FP)
+
+        /* end of the function body */
+
+        // function epilogue
+        movq    %FP,        %SP
+        movq    fp(%SP),    %FP
+        movq    ret(%SP),   %RET_ADDR
+        ret     %RET_ADDR
+
 
 /*
         uint64_t getu
@@ -177,7 +266,7 @@ putu:
 
         /* begin of the function body */
 
-        // local0 = n % 10; n /= 10;
+	// local0 = n % 10; n /= 10;
         subq    5 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
@@ -189,25 +278,25 @@ putu:
         movq    %4,         local0(%FP)
         addq    5 * 8,      %SP,        %SP
 
-        // if (n != 0) {
-        movq    fparam0(%FP),%4
-        subq    0,          %4,         %0
-        jz      .print.putu
+	// if (n != 0) {
+	movq	fparam0(%FP),%4
+	subq	0,	    %4,		%0
+	jz	.print.putu
 
-        // call: putu(n);
-        subq    4 * 8,      %SP,        %SP
+	// call: putu(n);
+	subq    4 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,       %4
+        load    putu,	    %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-        // }
+	// }
 
 .print.putu:
-        movq    local0(%FP),%4
-        addq    '0',        %4,         %4
-        putc    %4
+	movq	local0(%FP),%4
+	addq	'0',	    %4,		%4
+	putc	%4
 
         /* end of the function body */
 
@@ -368,14 +457,14 @@ puts:
 
         /* begin of the function body */
         movq    fparam0(%FP),%4
-.loop.puts:
+.loop.putu:
         movzbq  (%4),       %5
         subq    0,          %5,     %0
-        jz      .ret.puts
+        jz      .ret.putu
         putc    %5
         addq    1,          %4,     %4
-        jmp     .loop.puts
-.ret.puts
+        jmp     .loop.putu
+.ret.putu
 
         /* end of the function body */
 
