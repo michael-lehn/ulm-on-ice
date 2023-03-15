@@ -1,387 +1,258 @@
-        .equ    FP,         1
-        .equ    SP,         2
-        .equ    RET_ADDR,   3
-
-
-#
-#       Stack offsets used for functions
-#
-        .equ    ret,        0
-        .equ    fp,         ret + 8
-        .equ    rval,       fp + 8
-        .equ    fparam0,    rval + 8
-        .equ    fparam1,    fparam0 + 8     # extend if more than 2 parameters
-                                            # are needed
-
-        .equ    local0,     -8
-        .equ    local1,     local0 - 8      # extend if more than 2 local
-                                            # variables are needed
-
-	.data
-msg0:	.string "Type in some unsigned integer in decimal format\n\n"
-msg1:   .string "again? (type 'n' to exit, any other key to continue)\n"
-msg2:   .string "Tschüss!\n"
-
-neq:	.string "n = "
-got:	.string "got: n = "
-
-        .text
-#
-#       Initialize function stack
-#
-        load    0,          %SP
-        movq    %SP,        %FP
-
-        // reserve space for 2 local variables
-        subq    2 * 8,      %SP,        %SP
-
-        // call puts(msg0)
-        subq    4 * 8,      %SP,        %SP
-        load    msg0,        %4
-        movq    %4,         fparam0(%SP)
-        load    puts,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-.loop:
-        // call puts(neq)
-        subq    4 * 8,      %SP,        %SP
-        load    neq,        %4
-        movq    %4,         fparam0(%SP)
-        load    puts,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-	// local0 = getu();
-        subq    3 * 8,      %SP,        %SP
-        load    getu,       %4
-        call    %4,         %RET_ADDR
-	movq	rval(%SP),  %4
-	movq	%4,	    local0(%FP)
-        addq    3 * 8,      %SP,        %SP
-
-        // call puts(got)
-        subq    4 * 8,      %SP,        %SP
-        load    got,        %4
-        movq    %4,         fparam0(%SP)
-        load    puts,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-        // call putu(local0)
-        subq    4 * 8,      %SP,        %SP
-	movq	local0(%FP),%4
-        movq    %4,         fparam0(%SP)
-        load    putu,      %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-	putc	'\n'
-
-        // call puts(msg1)
-        subq    4 * 8,      %SP,        %SP
-        load    msg1,        %4
-        movq    %4,         fparam0(%SP)
-        load    puts,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-        getc    %4
-        subq    'n',        %4,         %0
-        jnz     .loop
-
-	// call puts(msg2)
-        subq    4 * 8,      %SP,        %SP
-        load    msg2,        %4
-        movq    %4,         fparam0(%SP)
-        load    puts,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-
-
-
-	halt	0
-
-/*
-        uint64_t getu
-*/
-getu:
-        // function prologue
-        movq    %RET_ADDR,  ret(%SP)
-        movq    %FP,        fp(%SP)
-        movq    %SP,        %FP
-
-	// reserve space for 2 local variables 'local0', 'local1'.
-        subq    2 * 8,      %SP,        %SP
-
-        /* begin of the function body */
-	// local0 = 0;
-	load	0,	    %4
-	movq	%4,	    local0(%FP)
-
-.loop.getu:
-	getc	%4
-	subq	'0',	    %4,		%0
-	jb	.done.getu
-	subq	'9',	    %4,		%0
-	ja	.done.getu
-
-	// local1 = %5 - '0';
-	subq	'0',	    %4,		%4
-	movq	%4,	    local1(%FP)
-
-	// local0 *= 10;
-        subq    5 * 8,      %SP,        %SP
-        movq    local0(%FP),%4
-        movq    %4,         fparam0(%SP)
-	load	10,	    %4
-	movq	%4,	    fparam1(%SP)
-        load    imulq,      %4
-        call    %4,         %RET_ADDR
-	movq	rval(%SP),  %4
-	movq	%4,	    local0(%FP)
-        addq    5 * 8,      %SP,        %SP
-
-	// local0 += local1
-	movq	local0(%FP),%4
-	movq	local1(%FP),%5
-	addq	%4,	    %5,		%4
-	movq	%4,	    local0(%FP)
-
-	jmp	.loop.getu
-
-.done.getu
-	movq	local0(%FP),%4
-	movq	%4,	    rval(%FP)
-
-        /* end of the function body */
-
-        // function epilogue
-        movq    %FP,        %SP
-        movq    fp(%SP),    %FP
-        movq    ret(%SP),   %RET_ADDR
-        ret     %RET_ADDR
-
-/*
-        void putu(uint64_t n)
-*/
-putu:
-        // function prologue
-        movq    %RET_ADDR,  ret(%SP)
-        movq    %FP,        fp(%SP)
-        movq    %SP,        %FP
-
-	// reserve space for 1 local variable 'local0'.
-        subq    1 * 8,      %SP,        %SP
-
-        /* begin of the function body */
-
-        // local0 = n % 10; n /= 10;
-        subq    5 * 8,      %SP,        %SP
-        movq    fparam0(%FP),%4
-        movq    %4,         fparam0(%SP)
-        load    div10,      %4
-        call    %4,         %RET_ADDR
-        movq    fparam0(%SP),%4
-        movq    %4,         fparam0(%FP)
-        movq    fparam1(%SP),%4
-        movq    %4,         local0(%FP)
-        addq    5 * 8,      %SP,        %SP
-
-        // if (n != 0) {
-        movq    fparam0(%FP),%4
-        subq    0,          %4,         %0
-        jz      .print.putu
-
-        // call: putu(n);
-        subq    4 * 8,      %SP,        %SP
-        movq    fparam0(%FP),%4
-        movq    %4,         fparam0(%SP)
-        load    putu,       %4
-        call    %4,         %RET_ADDR
-        addq    4 * 8,      %SP,        %SP
-
-        // }
-
-.print.putu:
-        movq    local0(%FP),%4
-        addq    '0',        %4,         %4
-        putc    %4
-
-        /* end of the function body */
-
-        // function epilogue
-        movq    %FP,        %SP
-        movq    fp(%SP),    %FP
-        movq    ret(%SP),   %RET_ADDR
-        ret     %RET_ADDR
-
-
-/*
-        void div10(uint64_t &n, uint64_t &r)
-*/
-div10:
-        // function prologue
-        movq    %RET_ADDR,  ret(%SP)
-        movq    %FP,        fp(%SP)
-        movq    %SP,        %FP
-
-        /* begin of the function body */
-	.equ    N,	    4
-    	.equ    Q,	    5
-    	.equ    R,	    6
-    	.equ    TMP,	    6
-
-	movq	fparam0(%FP),%N
-
-    	// q = (n >> 1) + (n >> 2);
-    	shrq    1,	    %N,		%Q
-    	shrq    2,	    %N,		%TMP
-    	addq    %Q,	    %TMP,	%Q
-
-    	// q = q + (q >> 4);
-    	shrq    4,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
-
-    	// q = q + (q >> 8);
-    	shrq    8,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
-
-    	// q = q + (q >> 16);
-    	shrq    16,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
-
-    	// q = q + (q >> 32);
-    	shrq    32,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
-
-    	// q = q >> 3;
-    	shrq    3,	    %Q,		%Q
-
-    	// r = n - (((q << 2) + q) << 1);
-    	shlq    2,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%TMP
-    	shlq    1,	    %TMP,	%TMP
-    	subq    %TMP,	    %N,		%R
-
-    	subq    9,	    %R,		%0
-    	jbe	.done
-    	addq    1,	    %Q,		%Q
-    	subq    10,	    %R,		%R
-.done:
-
-	movq	%Q,	    fparam0(%FP)
-	movq	%R,	    fparam1(%FP)
-
-        /* end of the function body */
-
-        // function epilogue
-        movq    %FP,        %SP
-        movq    fp(%SP),    %FP
-        movq    ret(%SP),   %RET_ADDR
-        ret     %RET_ADDR
-
-/*
-        uint64_t imulq(uint64_t a, uint64_t b)
-*/
-imulq:
-        // function prologue
-        movq    %RET_ADDR,  ret(%SP)
-        movq    %FP,        fp(%SP)
-        movq    %SP,        %FP
-
-        /* begin of the function body */
-
-        movq    fparam0(%FP),%4
-        movq    fparam1(%FP),%5
-
-        // a0 * b0
-        mulw    %4,         %5,         %6
-
-        // + (a1 * b0 + a0 * b1) * 2^16
-        shrq    16,         %4,         %7
-        mulw    %7,         %5,         %7
-
-        shrq    16,         %5,         %8
-        mulw    %8,         %4,         %8
-        addq    %8,         %7,         %7
-
-        shlq    16,         %7,         %7
-        addq    %7,         %6,         %6
-
-        // + (a2 * b0 + a1 * b1 + a0 * b2) * 2^32
-        shrq    32,         %4,         %7
-        mulw    %7,         %5,         %7
-
-        shrq    16,         %4,         %8
-        shrq    16,         %5,         %9
-        mulw    %8,         %9,         %8
-        addq    %8,         %7,         %7
-
-        shrq    32,         %5,         %8
-        mulw    %8,         %4,         %8
-        addq    %8,         %7,         %7
-
-        shlq    32,         %7,         %7
-        addq    %7,         %6,         %6
-
-        // + (a3 * b0 + a2 * b1 + a1 * b2 + a0 * b3) * 2^48
-        shrq    48,         %4,         %7
-        mulw    %7,         %5,         %7
-
-        shrq    32,         %4,         %8
-        shrq    16,         %5,         %9
-        mulw    %8,         %9,         %8
-        addq    %8,         %7,         %7
-
-        shrq    16,         %4,         %8
-        shrq    32,         %5,         %9
-        mulw    %8,         %9,         %8
-        addq    %8,         %7,         %7
-
-        shrq    48,         %5,         %8
-        mulw    %8,         %4,         %8
-        addq    %8,         %7,         %7
-
-        shlq    48,         %7,         %7
-        addq    %7,         %6,         %6
-
-        movq    %6,         rval(%FP)
-
-        /* end of the function body */
-
-        // function epilogue
-        movq    %FP,        %SP
-        movq    fp(%SP),    %FP
-        movq    ret(%SP),   %RET_ADDR
-        ret     %RET_ADDR
-
-/*
-        puts(const char *s)
-*/
-puts:
-        // function prologue
-        movq    %RET_ADDR,  ret(%SP)
-        movq    %FP,        fp(%SP)
-        movq    %SP,        %FP
-
-        /* begin of the function body */
-        movq    fparam0(%FP),%4
-.loop.puts:
-        movzbq  (%4),       %5
-        subq    0,          %5,     %0
-        jz      .ret.puts
-        putc    %5
-        addq    1,          %4,     %4
-        jmp     .loop.puts
-.ret.puts
-
-        /* end of the function body */
-
-        // function epilogue
-        movq    %FP,        %SP
-        movq    fp(%SP),    %FP
-        movq    ret(%SP),   %RET_ADDR
-        ret     %RET_ADDR
-
+#TEXT 4
+0x0000000000000000: 10 20 00 00 #     load 0, %SP
+0x0000000000000004: 11 10 20 00 #     movq %SP, %FP
+0x0000000000000008: 14 22 00 10 #     subq 2*8, %SP, %SP
+0x000000000000000C: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x0000000000000010: 10 40 03 28 #     load msg0, %4
+0x0000000000000014: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000018: 10 40 02 F0 #     load puts, %4
+0x000000000000001C: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000020: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x0000000000000024: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x0000000000000028: 10 40 03 9B #     load neq, %4
+0x000000000000002C: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000030: 10 40 02 F0 #     load puts, %4
+0x0000000000000034: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000038: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x000000000000003C: 14 22 00 18 #     subq 3*8, %SP, %SP
+0x0000000000000040: 10 40 00 C8 #     load getu, %4
+0x0000000000000044: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000048: 23 42 00 10 #     movq rval(%SP), %4
+0x000000000000004C: 24 41 FF F8 #     movq %4, local0(%FP)
+0x0000000000000050: 12 22 00 18 #     addq 3*8, %SP, %SP
+0x0000000000000054: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x0000000000000058: 10 40 03 A0 #     load got, %4
+0x000000000000005C: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000060: 10 40 02 F0 #     load puts, %4
+0x0000000000000064: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000068: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x000000000000006C: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x0000000000000070: 23 41 FF F8 #     movq local0(%FP), %4
+0x0000000000000074: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000078: 10 40 01 50 #     load putu, %4
+0x000000000000007C: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000080: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x0000000000000084: 31 0A 00 00 #     putc 10
+0x0000000000000088: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x000000000000008C: 10 40 03 5A #     load msg1, %4
+0x0000000000000090: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000094: 10 40 02 F0 #     load puts, %4
+0x0000000000000098: 07 43 00 00 #     call %4, %RET_ADDR
+0x000000000000009C: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x00000000000000A0: 32 40 00 00 #     getc %4
+0x00000000000000A4: 14 04 00 6E #     subq 110, %4, %0
+0x00000000000000A8: 03 FF FF DF #     jnz .loop
+0x00000000000000AC: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x00000000000000B0: 10 40 03 90 #     load msg2, %4
+0x00000000000000B4: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x00000000000000B8: 10 40 02 F0 #     load puts, %4
+0x00000000000000BC: 07 43 00 00 #     call %4, %RET_ADDR
+0x00000000000000C0: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x00000000000000C4: 01 00 00 00 #     halt 0
+0x00000000000000C8: 24 32 00 00 #     movq %RET_ADDR, ret(%SP)
+0x00000000000000CC: 24 12 00 08 #     movq %FP, fp(%SP)
+0x00000000000000D0: 11 10 20 00 #     movq %SP, %FP
+0x00000000000000D4: 14 22 00 10 #     subq 2*8, %SP, %SP
+0x00000000000000D8: 10 40 00 00 #     load 0, %4
+0x00000000000000DC: 24 41 FF F8 #     movq %4, local0(%FP)
+0x00000000000000E0: 32 40 00 00 #     getc %4
+0x00000000000000E4: 14 04 00 30 #     subq 48, %4, %0
+0x00000000000000E8: 06 00 00 14 #     jb .done.getu
+0x00000000000000EC: 14 04 00 39 #     subq 57, %4, %0
+0x00000000000000F0: 09 00 00 12 #     ja .done.getu
+0x00000000000000F4: 14 44 00 30 #     subq 48, %4, %4
+0x00000000000000F8: 24 41 FF F0 #     movq %4, local1(%FP)
+0x00000000000000FC: 14 22 00 28 #     subq 5*8, %SP, %SP
+0x0000000000000100: 23 41 FF F8 #     movq local0(%FP), %4
+0x0000000000000104: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x0000000000000108: 10 40 00 0A #     load 10, %4
+0x000000000000010C: 24 42 00 20 #     movq %4, fparam1(%SP)
+0x0000000000000110: 10 40 02 40 #     load imulq, %4
+0x0000000000000114: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000118: 23 42 00 10 #     movq rval(%SP), %4
+0x000000000000011C: 24 41 FF F8 #     movq %4, local0(%FP)
+0x0000000000000120: 12 22 00 28 #     addq 5*8, %SP, %SP
+0x0000000000000124: 23 41 FF F8 #     movq local0(%FP), %4
+0x0000000000000128: 23 51 FF F0 #     movq local1(%FP), %5
+0x000000000000012C: 11 45 40 00 #     addq %4, %5, %4
+0x0000000000000130: 24 41 FF F8 #     movq %4, local0(%FP)
+0x0000000000000134: 05 FF FF EB #     jmp .loop.getu
+0x0000000000000138: 23 41 FF F8 #     movq local0(%FP), %4
+0x000000000000013C: 24 41 00 10 #     movq %4, rval(%FP)
+0x0000000000000140: 11 20 10 00 #     movq %FP, %SP
+0x0000000000000144: 23 12 00 08 #     movq fp(%SP), %FP
+0x0000000000000148: 23 32 00 00 #     movq ret(%SP), %RET_ADDR
+0x000000000000014C: 07 30 00 00 #     ret %RET_ADDR
+0x0000000000000150: 24 32 00 00 #     movq %RET_ADDR, ret(%SP)
+0x0000000000000154: 24 12 00 08 #     movq %FP, fp(%SP)
+0x0000000000000158: 11 10 20 00 #     movq %SP, %FP
+0x000000000000015C: 14 22 00 08 #     subq 1*8, %SP, %SP
+0x0000000000000160: 14 22 00 28 #     subq 5*8, %SP, %SP
+0x0000000000000164: 23 41 00 18 #     movq fparam0(%FP), %4
+0x0000000000000168: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x000000000000016C: 10 40 01 C8 #     load div10, %4
+0x0000000000000170: 07 43 00 00 #     call %4, %RET_ADDR
+0x0000000000000174: 23 42 00 18 #     movq fparam0(%SP), %4
+0x0000000000000178: 24 41 00 18 #     movq %4, fparam0(%FP)
+0x000000000000017C: 23 42 00 20 #     movq fparam1(%SP), %4
+0x0000000000000180: 24 41 FF F8 #     movq %4, local0(%FP)
+0x0000000000000184: 12 22 00 28 #     addq 5*8, %SP, %SP
+0x0000000000000188: 23 41 00 18 #     movq fparam0(%FP), %4
+0x000000000000018C: 14 04 00 00 #     subq 0, %4, %0
+0x0000000000000190: 04 00 00 07 #     jz .print.putu
+0x0000000000000194: 14 22 00 20 #     subq 4*8, %SP, %SP
+0x0000000000000198: 23 41 00 18 #     movq fparam0(%FP), %4
+0x000000000000019C: 24 42 00 18 #     movq %4, fparam0(%SP)
+0x00000000000001A0: 10 40 01 50 #     load putu, %4
+0x00000000000001A4: 07 43 00 00 #     call %4, %RET_ADDR
+0x00000000000001A8: 12 22 00 20 #     addq 4*8, %SP, %SP
+0x00000000000001AC: 23 41 FF F8 #     movq local0(%FP), %4
+0x00000000000001B0: 12 44 00 30 #     addq 48, %4, %4
+0x00000000000001B4: 30 40 00 00 #     putc %4
+0x00000000000001B8: 11 20 10 00 #     movq %FP, %SP
+0x00000000000001BC: 23 12 00 08 #     movq fp(%SP), %FP
+0x00000000000001C0: 23 32 00 00 #     movq ret(%SP), %RET_ADDR
+0x00000000000001C4: 07 30 00 00 #     ret %RET_ADDR
+0x00000000000001C8: 24 32 00 00 #     movq %RET_ADDR, ret(%SP)
+0x00000000000001CC: 24 12 00 08 #     movq %FP, fp(%SP)
+0x00000000000001D0: 11 10 20 00 #     movq %SP, %FP
+0x00000000000001D4: 23 41 00 18 #     movq fparam0(%FP), %N
+0x00000000000001D8: 17 54 00 01 #     shrq 1, %N, %Q
+0x00000000000001DC: 17 64 00 02 #     shrq 2, %N, %TMP
+0x00000000000001E0: 11 56 50 00 #     addq %Q, %TMP, %Q
+0x00000000000001E4: 17 65 00 04 #     shrq 4, %Q, %TMP
+0x00000000000001E8: 11 56 50 00 #     addq %Q, %TMP, %Q
+0x00000000000001EC: 17 65 00 08 #     shrq 8, %Q, %TMP
+0x00000000000001F0: 11 56 50 00 #     addq %Q, %TMP, %Q
+0x00000000000001F4: 17 65 00 10 #     shrq 16, %Q, %TMP
+0x00000000000001F8: 11 56 50 00 #     addq %Q, %TMP, %Q
+0x00000000000001FC: 17 65 00 20 #     shrq 32, %Q, %TMP
+0x0000000000000200: 11 56 50 00 #     addq %Q, %TMP, %Q
+0x0000000000000204: 17 55 00 03 #     shrq 3, %Q, %Q
+0x0000000000000208: 18 65 00 02 #     shlq 2, %Q, %TMP
+0x000000000000020C: 11 66 50 00 #     addq %Q, %TMP, %TMP
+0x0000000000000210: 18 66 00 01 #     shlq 1, %TMP, %TMP
+0x0000000000000214: 13 64 60 00 #     subq %TMP, %N, %R
+0x0000000000000218: 14 06 00 09 #     subq 9, %R, %0
+0x000000000000021C: 08 00 00 03 #     jbe .done
+0x0000000000000220: 12 55 00 01 #     addq 1, %Q, %Q
+0x0000000000000224: 14 66 00 0A #     subq 10, %R, %R
+0x0000000000000228: 24 51 00 18 #     movq %Q, fparam0(%FP)
+0x000000000000022C: 24 61 00 20 #     movq %R, fparam1(%FP)
+0x0000000000000230: 11 20 10 00 #     movq %FP, %SP
+0x0000000000000234: 23 12 00 08 #     movq fp(%SP), %FP
+0x0000000000000238: 23 32 00 00 #     movq ret(%SP), %RET_ADDR
+0x000000000000023C: 07 30 00 00 #     ret %RET_ADDR
+0x0000000000000240: 24 32 00 00 #     movq %RET_ADDR, ret(%SP)
+0x0000000000000244: 24 12 00 08 #     movq %FP, fp(%SP)
+0x0000000000000248: 11 10 20 00 #     movq %SP, %FP
+0x000000000000024C: 23 41 00 18 #     movq fparam0(%FP), %4
+0x0000000000000250: 23 51 00 20 #     movq fparam1(%FP), %5
+0x0000000000000254: 15 65 40 00 #     mulw %4, %5, %6
+0x0000000000000258: 17 74 00 10 #     shrq 16, %4, %7
+0x000000000000025C: 15 75 70 00 #     mulw %7, %5, %7
+0x0000000000000260: 17 85 00 10 #     shrq 16, %5, %8
+0x0000000000000264: 15 84 80 00 #     mulw %8, %4, %8
+0x0000000000000268: 11 77 80 00 #     addq %8, %7, %7
+0x000000000000026C: 18 77 00 10 #     shlq 16, %7, %7
+0x0000000000000270: 11 66 70 00 #     addq %7, %6, %6
+0x0000000000000274: 17 74 00 20 #     shrq 32, %4, %7
+0x0000000000000278: 15 75 70 00 #     mulw %7, %5, %7
+0x000000000000027C: 17 84 00 10 #     shrq 16, %4, %8
+0x0000000000000280: 17 95 00 10 #     shrq 16, %5, %9
+0x0000000000000284: 15 89 80 00 #     mulw %8, %9, %8
+0x0000000000000288: 11 77 80 00 #     addq %8, %7, %7
+0x000000000000028C: 17 85 00 20 #     shrq 32, %5, %8
+0x0000000000000290: 15 84 80 00 #     mulw %8, %4, %8
+0x0000000000000294: 11 77 80 00 #     addq %8, %7, %7
+0x0000000000000298: 18 77 00 20 #     shlq 32, %7, %7
+0x000000000000029C: 11 66 70 00 #     addq %7, %6, %6
+0x00000000000002A0: 17 74 00 30 #     shrq 48, %4, %7
+0x00000000000002A4: 15 75 70 00 #     mulw %7, %5, %7
+0x00000000000002A8: 17 84 00 20 #     shrq 32, %4, %8
+0x00000000000002AC: 17 95 00 10 #     shrq 16, %5, %9
+0x00000000000002B0: 15 89 80 00 #     mulw %8, %9, %8
+0x00000000000002B4: 11 77 80 00 #     addq %8, %7, %7
+0x00000000000002B8: 17 84 00 10 #     shrq 16, %4, %8
+0x00000000000002BC: 17 95 00 20 #     shrq 32, %5, %9
+0x00000000000002C0: 15 89 80 00 #     mulw %8, %9, %8
+0x00000000000002C4: 11 77 80 00 #     addq %8, %7, %7
+0x00000000000002C8: 17 85 00 30 #     shrq 48, %5, %8
+0x00000000000002CC: 15 84 80 00 #     mulw %8, %4, %8
+0x00000000000002D0: 11 77 80 00 #     addq %8, %7, %7
+0x00000000000002D4: 18 77 00 30 #     shlq 48, %7, %7
+0x00000000000002D8: 11 66 70 00 #     addq %7, %6, %6
+0x00000000000002DC: 24 61 00 10 #     movq %6, rval(%FP)
+0x00000000000002E0: 11 20 10 00 #     movq %FP, %SP
+0x00000000000002E4: 23 12 00 08 #     movq fp(%SP), %FP
+0x00000000000002E8: 23 32 00 00 #     movq ret(%SP), %RET_ADDR
+0x00000000000002EC: 07 30 00 00 #     ret %RET_ADDR
+0x00000000000002F0: 24 32 00 00 #     movq %RET_ADDR, ret(%SP)
+0x00000000000002F4: 24 12 00 08 #     movq %FP, fp(%SP)
+0x00000000000002F8: 11 10 20 00 #     movq %SP, %FP
+0x00000000000002FC: 23 41 00 18 #     movq fparam0(%FP), %4
+0x0000000000000300: 20 54 00 00 #     movzbq (%4), %5
+0x0000000000000304: 14 05 00 00 #     subq 0, %5, %0
+0x0000000000000308: 04 00 00 04 #     jz .ret.puts
+0x000000000000030C: 30 50 00 00 #     putc %5
+0x0000000000000310: 12 44 00 01 #     addq 1, %4, %4
+0x0000000000000314: 05 FF FF FB #     jmp .loop.puts
+0x0000000000000318: 11 20 10 00 #     movq %FP, %SP
+0x000000000000031C: 23 12 00 08 #     movq fp(%SP), %FP
+0x0000000000000320: 23 32 00 00 #     movq ret(%SP), %RET_ADDR
+0x0000000000000324: 07 30 00 00 #     ret %RET_ADDR
+#DATA 1
+0x0000000000000328: 54 79 70 65 20 69 6E 20 73 6F 6D 65 20 75 6E 73 69 67 6E 65 64 20 69 6E 74 65 67 65 72 20 69 6E 20 64 65 63 69 6D 61 6C 20 66 6F 72 6D 61 74 0A 0A 00 #     .string "Type in some unsigned integer in decimal format\n\n"
+0x000000000000035A: 61 67 61 69 6E 3F 20 28 74 79 70 65 20 27 6E 27 20 74 6F 20 65 78 69 74 2C 20 61 6E 79 20 6F 74 68 65 72 20 6B 65 79 20 74 6F 20 63 6F 6E 74 69 6E 75 65 29 0A 00 #     .string "again? (type 'n' to exit, any other key to continue)\n"
+0x0000000000000390: 54 73 63 68 C3 BC 73 73 21 0A 00 #     .string "Tschüss!\n"
+0x000000000000039B: 6E 20 3D 20 00 #     .string "n = "
+0x00000000000003A0: 67 6F 74 3A 20 6E 20 3D 20 00 #     .string "got: n = "
+#BSS 1 0
+#SYMTAB
+a FP                   0x0000000000000001
+a SP                   0x0000000000000002
+a RET_ADDR             0x0000000000000003
+a ret                  0x0000000000000000
+a fp                   0x0000000000000008
+a rval                 0x0000000000000010
+a fparam0              0x0000000000000018
+a fparam1              0x0000000000000020
+a local0               0xFFFFFFFFFFFFFFF8
+a local1               0xFFFFFFFFFFFFFFF0
+d msg0                 0x0000000000000000
+d msg1                 0x0000000000000032
+d msg2                 0x0000000000000068
+d neq                  0x0000000000000073
+d got                  0x0000000000000078
+t puts                 0x00000000000002F0
+t .loop                0x0000000000000024
+t getu                 0x00000000000000C8
+t putu                 0x0000000000000150
+t .loop.getu           0x00000000000000E0
+t .done.getu           0x0000000000000138
+t imulq                0x0000000000000240
+t div10                0x00000000000001C8
+t .print.putu          0x00000000000001AC
+a N                    0x0000000000000004
+a Q                    0x0000000000000005
+a R                    0x0000000000000006
+a TMP                  0x0000000000000006
+t .done                0x0000000000000228
+t .loop.puts           0x0000000000000300
+t .ret.puts            0x0000000000000318
+#FIXUPS
+text 0x00000000000001A0 12 20 absolute [text]+336
+text 0x000000000000016C 12 20 absolute [text]+456
+text 0x0000000000000110 12 20 absolute [text]+576
+text 0x00000000000000B8 12 20 absolute [text]+752
+text 0x00000000000000B0 12 20 absolute [data]+104
+text 0x0000000000000094 12 20 absolute [text]+752
+text 0x000000000000008C 12 20 absolute [data]+50
+text 0x0000000000000078 12 20 absolute [text]+336
+text 0x0000000000000060 12 20 absolute [text]+752
+text 0x0000000000000058 12 20 absolute [data]+120
+text 0x0000000000000040 12 20 absolute [text]+200
+text 0x0000000000000030 12 20 absolute [text]+752
+text 0x0000000000000028 12 20 absolute [data]+115
+text 0x0000000000000018 12 20 absolute [text]+752
+text 0x0000000000000010 12 20 absolute [data]+0

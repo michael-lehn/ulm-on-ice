@@ -258,5 +258,3 @@ puts:
 	//
 	// end of text segment 
 	//
-	// hack align data segment here
-	.align 8
