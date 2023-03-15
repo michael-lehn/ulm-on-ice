@@ -4,7 +4,7 @@ Some example program you can execute on ULM-on-iCE. Simply copy and paste the
 hex code as shown in the demo. Main purpose of course is testing the
 instruction set with simple examples.
 
-## Generating your own executables
+### Generating your own executables
 
 Use `ulm-generator` with `isa.txt` to generate the assembler. 
 
