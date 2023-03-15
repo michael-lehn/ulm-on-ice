@@ -9,15 +9,15 @@ next semester.
 It is a simple implementation of the ULM (Ulm Lecture Machine) on a
 [iCEBreaker FPGA](https://1bitsquared.com/products/icebreaker).
 
-## What this is not...
+## Current state
 
-... not some place where you can learn how to design a CPU on an FPGA. This is
-just a "proof of concept" and "just for fun" project. Most of all it is my very
-first encounter with `Verilog` and `SystemVerilog` and the world of FPGAs. This
-is the result after one and a half month brutal trial and error. So don't
-expect to find here good practise examples.
+It's a working prototype, and it's is doing what it was designed for. When I
+started the project it was my first encounter with `Verilog` and
+`SystemVerilog` and the first time I had an FPGA in my hands. This means that
+there is lots of potential for improvement. And if time permits I will do so.
 
-Here some links to sites that helped me to get started:
+If you are also a newbie you might be interested in places where you find some
+information on getting started:
 - [Project F](https://projectf.io)
 - [Verilator introduction](https://itsembedded.com/dhd/verilator_1/)
 - [SystemVerilog tutorial](https://www.chipverify.com/systemverilog/systemverilog-tutorial)
