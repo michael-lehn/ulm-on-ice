@@ -23,7 +23,7 @@ msg1:	.string "The program will compute n! with 64-bit arithmetic.\n"
 msg2:	.string "Note: 20! is the largest value that can be stored in 64 bits\n"
 
 msg3:   .string "again? (type 'n' to exit, any other key to continue)\n"
-msg4:   .string "Tschüss!\n"
+msg4:   .string "\n\nTschüss!\n"
 
 neq:	.string "n = "
 nfeq:	.string "! = "
