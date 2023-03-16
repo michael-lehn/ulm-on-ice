@@ -19,6 +19,7 @@ module quad_ext_low (
 	case (data_type)
 	    default:
 		data_out = data_in;
+		/*
 	    RAM_LONG:
 		data_out = {
 		    data_in[RAM_LONG_SIZE-1:0],
@@ -34,6 +35,7 @@ module quad_ext_low (
 		    data_in[RAM_BYTE_SIZE-1:0],
 		    {RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}}
 		};
+		*/
 	endcase
     end
 
