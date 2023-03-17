@@ -1,6 +1,9 @@
 /*
  * FIFO
  *
+ * Code written after reading the paper 
+ * http://www.sunburst-design.com/papers/CummingsSNUG2002SJ_FIFO1.pdf
+ *
  * push_back == 1 --> data_in is stored in *next* cycle and an element
  *		      appended to the back in the *next* cycle
  * pop_front == 1 --> data_out is valid in *this* cycle and front element
