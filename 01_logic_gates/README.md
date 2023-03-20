@@ -4,7 +4,7 @@ File `test.sv` is a simple example for using an `always_comb` block. On the
 FPGA the logic described here will be realized by connecting LUTs (Lookup
 tables).  These LUTs are multiplexers with 4 control bits and one output
 (correct me if I am wrong).  Hence they can be used to realize boolean
-functions of the form $f: \\{0,1\\}^4 \to \\{0,1\\}$.
+functions of the form $f: \\{0,1\\}^{16} \to \\{0,1\\}$.
 
 ### Demo (Link to YouTube)
 
