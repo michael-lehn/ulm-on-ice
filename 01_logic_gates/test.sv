@@ -1,6 +1,6 @@
 module test (
-    input BTN1,
-    input BTN2,
+    input logic BTN1,
+    input logic BTN2,
     output logic LED1,
     output logic LED2
 );
