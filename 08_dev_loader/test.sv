@@ -44,7 +44,7 @@ module test (
     if_io io();
 
     assign LED1 = !io.getc_en;	  // inbuf is empty
-    assign LED2 = io.inbuf_full;	  // inbuf is full
+    assign LED2 = io.inbuf_full;  // inbuf is full
 
     initial begin
 	io.getc_pop = 0;

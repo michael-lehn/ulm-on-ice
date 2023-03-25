@@ -189,12 +189,17 @@ module dev_decoder (
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_AND;
 		end
-	    8'h17: // shrq a, %b, %s
+	    8'h17: // andq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_AND;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h18: // shrq a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SHR;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
 		end
-	    8'h18: // shlq a, %b, %s
+	    8'h19: // shlq a, %b, %s
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SHL;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
