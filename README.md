@@ -26,4 +26,6 @@ information on getting started:
 
 ## Demo (Link to YouTube)
 
-[<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/09_ulm_on_ice/demo.png" width="200">](https://youtu.be/jYW8OXb68nw)
+[<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/09_ulm_on_ice/demo_hello.png" width="200">](https://youtu.be/j96EJUkOHoc)
+
+[<img src="https://github.com/michael-lehn/icebreaker-examples/blob/main/09_ulm_on_ice/demo.png" width="200">](https://www.youtube.com/playlist?list=PL7bpgGDa-GJAgZmCLt6cgYch0mlWRdWok)
