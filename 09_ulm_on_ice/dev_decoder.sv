@@ -84,8 +84,20 @@ module dev_decoder (
 		instr_cu_next.op = !alu.zf && !alu.cf
 				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
-	    8'h0A: // ja offset
+	    8'h0A: // jae offset
 		instr_cu_next.op = !alu.cf
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h0B: // jge offset
+		instr_cu_next.op = alu.sf == alu.of
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h0C: // jnge offset
+		instr_cu_next.op = alu.sf != alu.of
+				 ? pkg_cu::CU_REL_JMP
+				 : pkg_cu::CU_NOP;
+	    8'h0D: // jng offset
+		instr_cu_next.op = alu.zf || alu.sf != alu.of
 				 ? pkg_cu::CU_REL_JMP
 				 : pkg_cu::CU_NOP;
 	    default:
@@ -155,7 +167,7 @@ module dev_decoder (
 	instr_alu_next.a_sel = pkg_alu::ALU_REG;
 
 	case (op)
-	    8'h10: // ldzwq a, %s  becomes a + %0 -> %s
+	    8'h10: // load a, %s  becomes u(a) + %0 -> u(%s)
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_ADD;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
@@ -203,6 +215,22 @@ module dev_decoder (
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_SHL;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h1A: // shrq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHR;
+		end
+	    8'h1B: // shlq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHL;
+		end
+	    8'h1C: // load a, %s  becomes s(a) + %0 -> s(%s)
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_ADD;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		    instr_alu_next.b_reg = 0;
+		    instr_alu_next.a_reg = 0;
+		    instr_alu_next.a_imm = {{64-20{ir[19]}}, ir[19:0]};
 		end
 	    default:
 		;

@@ -32,6 +32,7 @@ nfeq:	.string "! = "
 #
 #       Initialize function stack
 #
+	addq	0x4212,	    %3,		%0
         load    0,          %SP
         movq    %SP,        %FP
 

@@ -14,7 +14,7 @@ module test (
     assign LED2 = out2;
 
     always_comb begin
-	out1 = a & b;
+	out1 = a & b | a;
 	out2 = a | b;
     end
 

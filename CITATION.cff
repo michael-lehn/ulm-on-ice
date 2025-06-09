@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: >
+  If you use ulm-on-ice in your work or teaching, please cite it as below.
+title: "ulm-on-ice: Educational FPGA project for RISC-V softcore and system design"
+authors:
+  - family-names: Lehn
+    given-names: Michael C.
+    affiliation: Ulm University
+    orcid: https://orcid.org/0009-0001-3197-0945
+date-released: 2023-07-01
+version: "1.0"
+repository-code: https://github.com/michael-lehn/ulm-on-ice
+url: https://github.com/michael-lehn/ulm-on-ice
+license: MIT

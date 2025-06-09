@@ -21,6 +21,8 @@ module dev_alu #(
     logic of_res;
     logic of_acc = 0;
 
+    logic sf_acc = 0;
+
     always_comb begin
 
 	case (alu.op)
@@ -51,11 +53,14 @@ module dev_alu #(
 	endcase
 	
 	alu.s = alu.op == pkg_alu::ALU_NOP ? acc : res;
-	alu.cf = alu.op == pkg_alu::ALU_NOP ? cf_acc : cf_res;
-	alu.of = alu.op == pkg_alu::ALU_NOP ? of_acc : of_res;
+	//alu.cf = alu.op == pkg_alu::ALU_NOP ? cf_acc : cf_res;
+	alu.cf = cf_acc;
+	//alu.of = alu.op == pkg_alu::ALU_NOP ? of_acc : of_res;
+	alu.of = of_acc;
 
 	alu.zf = alu.s == 0;
-	alu.sf = alu.s[WIDTH-1];
+	//alu.sf = alu.s[WIDTH-1];
+	alu.sf = sf_acc;
     end
 
     always @ (posedge clk) begin
@@ -63,6 +68,7 @@ module dev_alu #(
 	    acc <= res;
 	    cf_acc <= cf_res;
 	    of_acc <= of_res;
+	    sf_acc <= alu.s[WIDTH-1];
 	end
     end
 
