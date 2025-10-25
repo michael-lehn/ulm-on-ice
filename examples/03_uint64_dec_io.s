@@ -29,7 +29,7 @@ got:	.string "got: n = "
 #
 #       Initialize function stack
 #
-        load    0,          %SP
+        loadz   0,          %SP
         movq    %SP,        %FP
 
         // reserve space for 2 local variables
@@ -37,24 +37,24 @@ got:	.string "got: n = "
 
         // call puts(msg0)
         subq    4 * 8,      %SP,        %SP
-        load    msg0,        %4
+        loadz   msg0,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz   puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
 .loop:
         // call puts(neq)
         subq    4 * 8,      %SP,        %SP
-        load    neq,        %4
+        loadz   neq,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz   puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
 	// local0 = getu();
         subq    3 * 8,      %SP,        %SP
-        load    getu,       %4
+        loadz   getu,       %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -62,9 +62,9 @@ got:	.string "got: n = "
 
         // call puts(got)
         subq    4 * 8,      %SP,        %SP
-        load    got,        %4
+        loadz   got,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz   puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -72,7 +72,7 @@ got:	.string "got: n = "
         subq    4 * 8,      %SP,        %SP
 	movq	local0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,      %4
+        loadz   putu,      %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -80,9 +80,9 @@ got:	.string "got: n = "
 
         // call puts(msg1)
         subq    4 * 8,      %SP,        %SP
-        load    msg1,        %4
+        loadz   msg1,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz   puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -92,9 +92,9 @@ got:	.string "got: n = "
 
 	// call puts(msg2)
         subq    4 * 8,      %SP,        %SP
-        load    msg2,        %4
+        loadz   msg2,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz   puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -117,7 +117,7 @@ getu:
 
         /* begin of the function body */
 	// local0 = 0;
-	load	0,	    %4
+	loadz	0,	    %4
 	movq	%4,	    local0(%FP)
 
 .loop.getu:
@@ -135,9 +135,9 @@ getu:
         subq    5 * 8,      %SP,        %SP
         movq    local0(%FP),%4
         movq    %4,         fparam0(%SP)
-	load	10,	    %4
+	loadz	10,	    %4
 	movq	%4,	    fparam1(%SP)
-        load    imulq,      %4
+        loadz   imulq,      %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -181,7 +181,7 @@ putu:
         subq    5 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    div10,      %4
+        loadz   div10,      %4
         call    %4,         %RET_ADDR
         movq    fparam0(%SP),%4
         movq    %4,         fparam0(%FP)
@@ -198,7 +198,7 @@ putu:
         subq    4 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,       %4
+        loadz   putu,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 

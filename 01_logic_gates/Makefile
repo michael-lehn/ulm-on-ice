@@ -30,7 +30,7 @@ synTool.flags := \
     	-p 'synth_ice40 -abc9 -dffe_min_ce_use 4 -device u -dsp \
 		-top $(MODULE) -json $(MODULE.json)'
 pnr := nextpnr-ice40
-pnr.flags := --up5k --package sg48 --json $(MODULE.json) --pcf $(pcf) --asc
+pnr.flags := --pcf-allow-unconstrained --up5k --package sg48 --json $(MODULE.json) --pcf $(pcf) --asc
 
 pack := icepack
 prog := iceprog

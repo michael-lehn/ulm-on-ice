@@ -5,7 +5,7 @@
 msg	.string "hello, world! 🍺 \n你好世界\nHallo, Welt\nGrüße aus Ulm ;-)\n"
 
 	.text
-	load   msg,	%p
+	loadz   msg,	%p
 fetch	movzbq	(%p),	%ch
 	addq	1,	%p,	%p
 	subq	0,	%ch,	%0
@@ -13,4 +13,3 @@ fetch	movzbq	(%p),	%ch
 	putc	%ch
 	jmp	fetch
 halt	halt	0x42
-

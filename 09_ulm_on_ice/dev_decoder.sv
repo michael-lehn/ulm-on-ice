@@ -167,7 +167,7 @@ module dev_decoder (
 	instr_alu_next.a_sel = pkg_alu::ALU_REG;
 
 	case (op)
-	    8'h10: // load a, %s  becomes u(a) + %0 -> u(%s)
+	    8'h10: // loadz a, %s  becomes u(a) + %0 -> u(%s)
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_ADD;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
@@ -175,62 +175,67 @@ module dev_decoder (
 		    instr_alu_next.a_reg = 0;
 		    instr_alu_next.a_imm = {{64-20{1'b0}}, ir[19:0]};
 		end
-	    8'h11: // addq %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_ADD;
-		end
-	    8'h12: // addq a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_ADD;
-		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
-		end
-	    8'h13: // subq %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SUB;
-		end
-	    8'h14: // subq a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SUB;
-		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
-		end
-	    8'h15: // mulw %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_MULW;
-		end
-	    8'h16: // andq %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_AND;
-		end
-	    8'h17: // andq a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_AND;
-		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
-		end
-	    8'h18: // shrq a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SHR;
-		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
-		end
-	    8'h19: // shlq a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SHL;
-		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
-		end
-	    8'h1A: // shrq %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SHR;
-		end
-	    8'h1B: // shlq %a, %b, %s
-		begin
-		    instr_alu_next.op = pkg_alu::ALU_SHL;
-		end
-	    8'h1C: // load a, %s  becomes s(a) + %0 -> s(%s)
+	    8'h11: // loads a, %s  becomes s(a) + %0 -> s(%s)
 		begin
 		    instr_alu_next.op = pkg_alu::ALU_ADD;
 		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
 		    instr_alu_next.b_reg = 0;
 		    instr_alu_next.a_reg = 0;
 		    instr_alu_next.a_imm = {{64-20{ir[19]}}, ir[19:0]};
+		end
+	    8'h12: // addq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_ADD;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h13: // addq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_ADD;
+		end
+	    8'h14: // subq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SUB;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h15: // subq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SUB;
+		end
+	    8'h16: // mulw a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_MULW;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h17: // mulw %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_MULW;
+		end
+	    8'h18: // andq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_AND;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end  
+	    8'h19: // andq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_AND;
+		end  
+	    8'h1A: // shrq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHR;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h1B: // shrq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHR;
+		end
+	    8'h1C: // shlq a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHL;
+		    instr_alu_next.a_sel = pkg_alu::ALU_IMM;
+		end
+	    8'h1D: // shlq %a, %b, %s
+		begin
+		    instr_alu_next.op = pkg_alu::ALU_SHL;
 		end
 	    default:
 		;
@@ -271,6 +276,7 @@ module dev_decoder (
 		    instr_bus_next.op = pkg_bus::BUS_FETCH;
 		    instr_bus_next.data_type = pkg_ram::RAM_BYTE;
 		end
+	    // TODO: opcode 0x21 movsbq
 	    8'h22: // movb %data, offset(%addr)
 		begin
 		    instr_bus_next.op = pkg_bus::BUS_STORE;

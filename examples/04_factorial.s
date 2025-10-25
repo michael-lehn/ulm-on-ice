@@ -33,7 +33,7 @@ nfeq:	.string "! = "
 #       Initialize function stack
 #
 	addq	0x4212,	    %3,		%0
-        load    0,          %SP
+        loadz    0,          %SP
         movq    %SP,        %FP
 
         // reserve space for 1 local variable
@@ -41,25 +41,25 @@ nfeq:	.string "! = "
 
         // call puts(msg0)
         subq    4 * 8,      %SP,        %SP
-        load    msg0,        %4
+        loadz    msg0,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
         // call puts(msg1)
         subq    4 * 8,      %SP,        %SP
-        load    msg1,        %4
+        loadz    msg1,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
         // call puts(msg2)
         subq    4 * 8,      %SP,        %SP
-        load    msg2,        %4
+        loadz    msg2,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -67,15 +67,15 @@ nfeq:	.string "! = "
 .loop:
         // call puts(neq)
         subq    4 * 8,      %SP,        %SP
-        load    neq,        %4
+        loadz    neq,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
 	// local0 = getu();
         subq    3 * 8,      %SP,        %SP
-        load    getu,       %4
+        loadz    getu,       %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -85,15 +85,15 @@ nfeq:	.string "! = "
         subq    4 * 8,      %SP,        %SP
 	movq	local0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,      %4
+        loadz    putu,      %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
         // call puts(nfeq)
         subq    4 * 8,      %SP,        %SP
-        load    nfeq,       %4
+        loadz    nfeq,       %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -101,7 +101,7 @@ nfeq:	.string "! = "
         subq    4 * 8,      %SP,        %SP
 	movq	local0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    factorial,  %4
+        loadz    factorial,  %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -112,7 +112,7 @@ nfeq:	.string "! = "
         subq    4 * 8,      %SP,        %SP
 	movq	local0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,      %4
+        loadz    putu,      %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -120,9 +120,9 @@ nfeq:	.string "! = "
 
         // call puts(msg3)
         subq    4 * 8,      %SP,        %SP
-        load    msg3,        %4
+        loadz    msg3,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -132,9 +132,9 @@ nfeq:	.string "! = "
 
 	// call puts(msg4)
         subq    4 * 8,      %SP,        %SP
-        load    msg4,        %4
+        loadz    msg4,        %4
         movq    %4,         fparam0(%SP)
-        load    puts,       %4
+        loadz    puts,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
@@ -154,7 +154,7 @@ factorial:
 
         /* begin of the function body */
 
-	load	1,	    %4
+	loadz	1,	    %4
 	movq	%4,	    local0(%FP)
 
 .loop.factorial:
@@ -168,7 +168,7 @@ factorial:
         movq    %4,         fparam0(%SP)
 	movq	fparam0(%FP),%4
         movq    %4,         fparam1(%SP)
-        load    imulq,      %4
+        loadz    imulq,      %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -207,7 +207,7 @@ getu:
 
         /* begin of the function body */
 	// local0 = 0;
-	load	0,	    %4
+	loadz	0,	    %4
 	movq	%4,	    local0(%FP)
 
 .loop.getu:
@@ -225,9 +225,9 @@ getu:
         subq    5 * 8,      %SP,        %SP
         movq    local0(%FP),%4
         movq    %4,         fparam0(%SP)
-	load	10,	    %4
+	loadz	10,	    %4
 	movq	%4,	    fparam1(%SP)
-        load    imulq,      %4
+        loadz    imulq,      %4
         call    %4,         %RET_ADDR
 	movq	rval(%SP),  %4
 	movq	%4,	    local0(%FP)
@@ -271,7 +271,7 @@ putu:
         subq    5 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    div10,      %4
+        loadz    div10,      %4
         call    %4,         %RET_ADDR
         movq    fparam0(%SP),%4
         movq    %4,         fparam0(%FP)
@@ -288,7 +288,7 @@ putu:
 	subq    4 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
-        load    putu,	    %4
+        loadz    putu,	    %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
