@@ -27,6 +27,16 @@ set_io -nowarn FLASH_IO1  17
 set_io -nowarn FLASH_IO2  12
 set_io -nowarn FLASH_IO3  13
 
+# for hex display
+set_io -nowarn A0	   4
+set_io -nowarn A1          2
+set_io -nowarn A2         47
+set_io -nowarn A3         45
+set_io -nowarn A4          3
+set_io -nowarn A5         48
+set_io -nowarn A6         46
+set_io -nowarn A7         44
+
 # PMOD 1A
 set_io -nowarn P1A1        4
 set_io -nowarn P1A2        2
