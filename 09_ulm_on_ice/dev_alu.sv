@@ -25,51 +25,51 @@ module dev_alu #(
 
     always_comb begin
 
-	case (alu.op)
-	    pkg_alu::ALU_ADD:
-		{cf_res, res} = alu.b + alu.a;
-	    pkg_alu::ALU_SUB:
-		{cf_res, res} = alu.b - alu.a;
-	    pkg_alu::ALU_AND:
-		{cf_res, res} = {1'b0, alu.b & alu.a};
-	    pkg_alu::ALU_SHR:
-		{cf_res, res} = {1'b0, alu.b >> alu.a};
-	    pkg_alu::ALU_SHL:
-		{cf_res, res} = {1'b0, alu.b << alu.a};
-	    pkg_alu::ALU_MULW:
-		{cf_res, res} = {1'b0, {WIDTH-32{1'b0}}, prod};
-	    default:
-		{cf_res, res} = 0;
-	endcase
+        case (alu.op)
+            pkg_alu::ALU_ADD:
+                {cf_res, res} = alu.b + alu.a;
+            pkg_alu::ALU_SUB:
+                {cf_res, res} = alu.b - alu.a;
+            pkg_alu::ALU_AND:
+                {cf_res, res} = {1'b0, alu.b & alu.a};
+            pkg_alu::ALU_SHR:
+                {cf_res, res} = {1'b0, alu.b >> alu.a};
+            pkg_alu::ALU_SHL:
+                {cf_res, res} = {1'b0, alu.b << alu.a};
+            pkg_alu::ALU_MULW:
+                {cf_res, res} = {1'b0, {WIDTH-32{1'b0}}, prod};
+            default:
+                {cf_res, res} = 0;
+        endcase
 
-	case (alu.op)
-	    pkg_alu::ALU_ADD:
-		of_res = res[WIDTH-1] && ~alu.b[WIDTH-1] && ~alu.a[WIDTH-1]
-		      || ~res[WIDTH-1] && alu.b[WIDTH-1] && alu.a[WIDTH-1];
-	     pkg_alu::ALU_SUB:
-		of_res = ~res[WIDTH-1] && alu.b[WIDTH-1] && ~alu.a[WIDTH-1]
-		      || res[WIDTH-1] && ~alu.b[WIDTH-1] && alu.a[WIDTH-1];
-	    default: of_res = 0;
-	endcase
-	
-	alu.s = alu.op == pkg_alu::ALU_NOP ? acc : res;
-	//alu.cf = alu.op == pkg_alu::ALU_NOP ? cf_acc : cf_res;
-	alu.cf = cf_acc;
-	//alu.of = alu.op == pkg_alu::ALU_NOP ? of_acc : of_res;
-	alu.of = of_acc;
+        case (alu.op)
+            pkg_alu::ALU_ADD:
+                of_res = res[WIDTH-1] && ~alu.b[WIDTH-1] && ~alu.a[WIDTH-1]
+                      || ~res[WIDTH-1] && alu.b[WIDTH-1] && alu.a[WIDTH-1];
+             pkg_alu::ALU_SUB:
+                of_res = ~res[WIDTH-1] && alu.b[WIDTH-1] && ~alu.a[WIDTH-1]
+                      || res[WIDTH-1] && ~alu.b[WIDTH-1] && alu.a[WIDTH-1];
+            default: of_res = 0;
+        endcase
+        
+        alu.s = alu.op == pkg_alu::ALU_NOP ? acc : res;
+        //alu.cf = alu.op == pkg_alu::ALU_NOP ? cf_acc : cf_res;
+        alu.cf = cf_acc;
+        //alu.of = alu.op == pkg_alu::ALU_NOP ? of_acc : of_res;
+        alu.of = of_acc;
 
-	alu.zf = alu.s == 0;
-	//alu.sf = alu.s[WIDTH-1];
-	alu.sf = sf_acc;
+        alu.zf = alu.s == 0;
+        //alu.sf = alu.s[WIDTH-1];
+        alu.sf = sf_acc;
     end
 
     always @ (posedge clk) begin
-	if (alu.op != pkg_alu::ALU_NOP) begin
-	    acc <= res;
-	    cf_acc <= cf_res;
-	    of_acc <= of_res;
-	    sf_acc <= alu.s[WIDTH-1];
-	end
+        if (alu.op != pkg_alu::ALU_NOP) begin
+            acc <= res;
+            cf_acc <= cf_res;
+            of_acc <= of_res;
+            sf_acc <= alu.s[WIDTH-1];
+        end
     end
 
 endmodule

@@ -1,0 +1,83 @@
+\input{preamble}
+
+\title{ULM on ICE\\[6pt]
+       \large Building a Computer on an FPGA, Step by Step}
+\author{Michael C. Lehn}
+\date{}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\chapter*{Preface}
+\addcontentsline{toc}{chapter}{Preface}
+
+The ULM, the \emph{Ulm Lecture Machine}, is the computer we use in our lectures
+to explain what a machine does with a program. It has sixteen 64-bit registers,
+a memory, instructions of 32 bits, and a few instructions to read and write
+characters. Until now it existed as a simulator. In these notes we build it as
+real hardware: on an FPGA, a chip whose circuits are not fixed when it leaves
+the factory but are configured later.
+
+We do not build it in one go. The repository \cc{ulm-on-ice} consists of nine
+directories, \cc{01_logic_gates} to \cc{09_ulm_on_ice}, and each of them is a
+small, complete project that you can simulate, put on the FPGA and try out.
+The first one connects two buttons to two LEDs through a few logic gates, the
+last one is the ULM, running programs that we type in through a terminal. Each
+step adds one new idea, and each chapter of these notes is one step.
+
+On the way you should learn three things:
+\begin{itemize}
+\item what an FPGA is, and what it can and cannot do;
+\item how we describe a circuit in SystemVerilog, and how the tools turn this
+  description into a configuration of the FPGA;
+\item how a computer is built from parts that you know: gates, flip-flops,
+  multiplexers, adders, registers and memory.
+\end{itemize}
+
+We assume that you know logic gates and flip-flops, and that you have built
+small circuits with a tool like CircuitVerse: an adder, a multiplexer, a
+register. This is all the hardware background we need. The rest is introduced
+when a step needs it, and only as much as that step needs.
+
+Most of all, we treat SystemVerilog as what it is: \emph{a textual
+representation of circuits}. It looks like a programming language, and this is
+the source of most misunderstandings. A line of SystemVerilog does not do
+something at some point in time. It says how wires are connected. Whenever a
+construct is new, we first ask which circuit it describes.
+
+The notes are a tutorial, so they are meant to be worked through with the
+repository and the board at hand. Every listing of SystemVerilog is taken
+directly from the repository, and all the output shown was produced by the
+tools on a Mac (yosys 0.70, nextpnr 0.11.1, Verilator 5.052, sv2v 0.0.13). Your
+output may differ in details.
+
+The board is an \href{https://1bitsquared.com/products/icebreaker}{iCEBreaker},
+with the small button-and-LED module that comes with it and the 7-segment
+display module from the same manufacturer. The idea for the material grew out
+of the course \emph{HPC0}, where we build a Mini-ALU in CircuitVerse, first
+look at its description in SystemVerilog, and then put it on exactly this
+board.
+
+\part{Getting Started}
+\label{part:start}
+
+\input{chapters/overview}
+\input{chapters/step01}
+\input{chapters/step02}
+
+\part{From Counters to a Computer}
+\label{part:computer}
+
+\input{chapters/step03}
+\input{chapters/step04}
+\input{chapters/step05}
+\input{chapters/step06}
+\input{chapters/step07}
+\input{chapters/step08}
+\input{chapters/step09}
+
+\appendix
+\input{chapters/tools}
+\input{chapters/glossary}
+\end{document}

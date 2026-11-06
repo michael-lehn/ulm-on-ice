@@ -1,0 +1,36 @@
+$ make sim
+...
+
+### SIMULATING ###
+== examples/01_hello
+loaded after 802 cycles, halted 2046 cycles later
+exit code 0x42 (expected 0x42)
+output (65 bytes):
+...
+Hallo, Welt
+Grüße aus Ulm ;-)
+
+PASSED
+
+== putc 'A' keeps %4
+loaded after 138 cycles, halted 22 cycles later
+exit code 0x07 (expected 0x07)
+output (1 bytes):
+A
+PASSED
+
+== jnz keeps %15
+loaded after 170 cycles, halted 46 cycles later
+exit code 0x05 (expected 0x05)
+output (0 bytes):
+
+PASSED
+
+== movsbq
+loaded after 210 cycles, halted 31 cycles later
+exit code 0xfd (expected 0xfd)
+output (0 bytes):
+
+PASSED
+
+ALL PASSED

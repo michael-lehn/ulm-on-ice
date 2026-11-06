@@ -1,0 +1,28 @@
+$ make report
+...
+Resource report for test in 07_io_interface
+
+== Device utilisation (nextpnr, iCE40 UP5K) ==
+   ICESTORM_LC = logic cell (4-input LUT + flip-flop)
+
+    ICESTORM_LC:       285/   5280    5%
+    ICESTORM_RAM:        2/     30    6%
+    SB_IO:              24/     39   61%
+    SB_GB:               1/      8   12%
+
+Max frequency for clock 'CLK$SB_IO_IN_$glb_clk': 52.80 MHz (PASS at 12.00 MHz)
+
+== Cells per module (yosys) ==
+   first line: the whole design; below it: the cells of each submodule
+   itself, without its own submodules (indented under it)
+   cells = LUTs, flip-flops, carry cells, RAMs, ... (before packing into logic cells)
+   modules with interface ports are merged into their parent by sv2v
+
+      585 test
+       65 uart_rx
+       58   baud_tick_gen
+       29 uart_tx
+       58   baud_tick_gen
+        1 dp_bram4096
+       62 debounce
+       47 dev_hex

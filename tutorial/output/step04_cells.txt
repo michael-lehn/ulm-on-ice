@@ -1,0 +1,8 @@
+SB_DFFE  C=CLK, D=B0, E=BTN1, Q=hex_val[7]
+SB_DFFE  C=CLK, D=B1, E=BTN1, Q=hex_val[6]
+SB_DFFE  C=CLK, D=B2, E=BTN1, Q=hex_val[5]
+SB_DFFE  C=CLK, D=B3, E=BTN1, Q=hex_val[4]
+SB_DFFE  C=CLK, D=B4, E=BTN1, Q=hex_val[3]
+SB_DFFE  C=CLK, D=B5, E=BTN1, Q=hex_val[2]
+SB_DFFE  C=CLK, D=B6, E=BTN1, Q=hex_val[1]
+SB_DFFE  C=CLK, D=B7, E=BTN1, Q=hex_val[0]

@@ -1,0 +1,536 @@
+\chapter{Step 05: A Mini-ALU}
+\label{ch:step05}
+
+% Listings with line numbers, for listings whose lines the text refers to.
+\lstdefinestyle{numbered}{numbers=left,numberstyle=\tiny\color{codecomment},numbersep=6pt}
+
+% Inline code that contains a percent sign, such as a register name \ccpct{%1}.
+\providecommand{\ccpct}{\begingroup\catcode`\%=12 \ccpctaux}
+\providecommand{\ccpctaux}[1]{\cc{#1}\endgroup}
+
+With step 05 the board starts to compute. The design of \cc{05_mini_alu} is
+the Mini-ALU that we build in CircuitVerse in the course HPC0 (worksheets 4
+and 6): four 8-bit registers, one of them the zero register, an
+adder/subtractor, four status flags and a decoder. It executes 8-bit
+instructions that we set on the DIP switch, one per press of a button. The
+new pieces of SystemVerilog are the array, four registers under one name
+selected by a signal, and the replication \cc{{8{sub}}}. And for the first
+time we react to a button press rather than to the level of the button, with
+the synchroniser and debouncer of Exercise~\ref{ex:step04-count}.
+
+\section{The Mini-ALU from the Course}
+\label{sec:step05-course}
+
+Let us first recall what we built in CircuitVerse, so that we can compare it
+with the text later.
+
+\textbf{The instruction format.} An instruction is a bit pattern
+$(\mathit{instr}_7, \dots, \mathit{instr}_0)$, split into four fields of two
+bits each:
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+$\mathit{instr}_7\,\mathit{instr}_6$ & $\mathit{instr}_5\,\mathit{instr}_4$ &
+$\mathit{instr}_3\,\mathit{instr}_2$ & $\mathit{instr}_1\,\mathit{instr}_0$ \\
+\midrule
+Op & X & Y & Z \\
+\bottomrule
+\end{tabular}
+\end{center}
+Op is the operation code, X, Y and Z name one of the four registers \ccpct{%0} to
+\ccpct{%3}, and XY is the 4-bit pattern $(\mathit{instr}_5, \dots,
+\mathit{instr}_2)$. With $u(\cdot)$ for the unsigned integer that a bit pattern
+represents, worksheet 4 defines
+\begin{center}
+\begin{tabular}{cl}
+\toprule
+Op & operation \\
+\midrule
+00 & $u(\mathrm{XY}) \to u(\%Z)$ \\
+01 & $(u(\mathrm{XY}) \cdot 2^4 + u(\%Z)) \bmod 2^8 \to u(\%Z)$ \\
+10 & $(u(\%X) + u(\%Y)) \bmod 2^8 \to u(\%Z)$ \\
+11 & $(u(\%X) - u(\%Y)) \bmod 2^8 \to u(\%Z)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The first two operations together build any 8-bit value in a register: Op =
+00 sets the low nibble and clears the high one, Op = 01 then adds the high
+nibble.
+
+\textbf{The parts.} The CircuitVerse Mini-ALU consists of
+\begin{itemize}
+\item a \emph{register file} with four 8-bit registers, one write port
+  (\cc{data_in}, \cc{addr_in}) and two read ports (\cc{addr1_out},
+  \cc{addr2_out}). A demultiplexer selects the register that receives the clock
+  edge, a multiplexer per read port selects the register that is read. \ccpct{%0}
+  is a \emph{zero register}: it has no flip-flops at all, reading it selects a
+  constant 0, and a value written to it is lost;
+\item an 8-bit \emph{adder/subtractor}: one adder whose second operand $b$ is
+  passed through XOR gates, so that \cc{add/sub} $= 1$ inverts it and also
+  feeds the carry-in (the XOR trick: $b \xor 0 = b$, $b \xor 1 = \neg b$);
+\item the \emph{status flags}, computed from the operands $a$, $b$, the result
+  $s$ and the carry-out, and stored in four flip-flops:
+  ZF $= 1$ if $s = 0$; CF, the carry-out for an addition and the inverted
+  carry-out for a subtraction; SF $= s_7$; and OF $= 1$ if $a$ and the added
+  operand ($b$, or $\neg b$ for a subtraction) have the same sign and $s$ has
+  the other one;
+\item modules \cc{ZeroExtend} and \cc{LeftShift} for the immediate values of
+  Op = 00 and Op = 01;
+\item the \emph{ALU}, which connects them: the first operand of the adder is
+  either the immediate value \cc{data_in} or the register \cc{data1_out},
+  chosen by \cc{use_data1_out}; the second operand is always \cc{data2_out};
+  the result goes back to the register file;
+\item the \emph{decoder}, which splits the instruction with splitters and
+  produces the control signals.
+\end{itemize}
+The only inputs left at the end are the instruction and the clock. The decoder
+of worksheet 6 connects \cc{addr_in} to Z and \cc{addr1_out} to X, and
+chooses the rest by Op:
+\begin{center}
+\begin{tabular}{cllcc}
+\toprule
+Op & \cc{data_in} & \cc{addr2_out} & \cc{add/sub} & \cc{use_data1_out} \\
+\midrule
+00 & \cc{ZeroExtend}(XY) & 00, so $b = u(\%0) = 0$ & 0 & 0 \\
+01 & \cc{LeftShift}(XY) & Z & 0 & 0 \\
+10 & (not used) & Y & 0 & 1 \\
+11 & (not used) & Y & 1 & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+So every instruction is an addition or a subtraction $a \pm b$, even the two
+that load a value. (The table of operations in the decoder step of worksheet 6
+writes Op = 11 as $(-u(\%X) + u(\%Y)) \bmod 2^8$. The circuit, with $a$ from
+X and $b$ from Y, computes $u(\%X) - u(\%Y)$, as worksheet 4 and the final
+table of worksheet 6 say, and so does our code.)
+
+\section{The Description in SystemVerilog}
+\label{sec:step05-sv}
+
+The file \cc{test.sv} describes exactly this circuit
+(Figure~\ref{fig:step05-datapath}), except for the clock, which we discuss in
+Section~\ref{sec:step05-button}. We go through it in pieces.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1mm,y=1mm,font=\small,
+    mux/.style={draw,rounded corners=2pt,fill=blue!7,minimum height=11mm,minimum width=5mm,inner sep=1pt,font=\scriptsize},
+    op/.style={box,fill=black!5,minimum height=7mm}]
+  % register file
+  \node[box,fill=green!10,minimum width=17mm,minimum height=30mm,anchor=north west] (rf) at (0,30) {};
+  \node[draw,dashed,minimum width=12mm,minimum height=5mm,font=\scriptsize] at (8.5,25) {\texttt{\%0} = 0};
+  \foreach \i/\y in {1/18.5,2/12,3/5.5} {
+    \node[draw,fill=white,minimum width=12mm,minimum height=5mm,font=\scriptsize] at (8.5,\y) {\texttt{\%\i}};
+  }
+  \node[note,rotate=90,anchor=south] at (rf.west) {\cc{register}};
+  % read ports
+  \node[mux] (mx) at (28,24) {X};
+  \node[mux,minimum width=9mm] (my) at (28,6) {\cc{addr2}};
+  \draw[wire,->] (rf.east |- mx) -- (mx.west);
+  \draw[wire,->] (rf.east |- my) -- (my.west);
+  % operand a
+  \node[mux] (ma) at (46,22) {};
+  \node[note,above=0.5mm of ma] {\cc{use_data1}};
+  \node[note,anchor=east] (imm) at (42,19) {\cc{imm}};
+  \draw[wire,->] (mx.east) -- (mx.east -| ma.west);
+  \draw[wire,->] (imm.east) -- (imm.east -| ma.west);
+  % operand b
+  \node[op] (xor) at (46,6) {$\xor$ \cc{sub}};
+  \draw[wire,->] (my.east) -- (xor.west);
+  % adder
+  \node[op,minimum height=26mm,minimum width=9mm] (add) at (64,15) {$+$};
+  \node[note,below=0.5mm of add] {carry-in \cc{sub}};
+  \draw[wire,->] (ma.east) -- (ma.east -| add.west);
+  \draw[wire,->] (xor.east) -- (xor.east -| add.west);
+  % flags
+  \node[box,fill=green!10,minimum width=16mm] (fl) at (90,6) {ZF CF\\SF OF};
+  \node[note,below=0.5mm of fl] {\cc{LED1}--\cc{LED4}};
+  \draw[wire,->] (add.east |- fl) -- node[above,note]{\cc{s}, \cc{cout}} (fl.west);
+  % result back to the register file
+  \draw[wire,->] (add.east |- ma) -- (76,22) -- (76,38)
+    -- node[above,note]{\cc{s}, written into \texttt{\%Z}} (8.5,38) -- (rf.north);
+  % display
+  \node[mux] (md) at (28,-12) {};
+  \node[note,below=0mm of md] {\cc{BTN3}, \cc{BTN2}};
+  \draw[wire,->] (rf.south) |- (md.west);
+  \node[note,anchor=north east,align=right] at (7.5,-1) {clock \cc{CLK}\\enable: \cc{exec}, \cc{z} $\ne 0$};
+  \node[box,fill=yellow!12] (hex) at (58,-12) {\cc{dev_hex}};
+  \draw[wire,->] (md.east) -- (hex.west);
+\end{tikzpicture}
+\caption{The circuit described by \cc{05_mini_alu/test.sv}. The decoder (not
+drawn) computes \cc{imm}, \cc{addr2}, \cc{sub} and \cc{use_data1} from the
+instruction. Every read multiplexer gives 0 for address 0. At a rising edge of
+\cc{CLK} in which \cc{exec} is 1, the sum \cc{s} is written into register Z
+(unless Z is \texttt{\%0}) and the flags are stored.}
+\label{fig:step05-datapath}
+\end{figure}
+
+\svpart{style=numbered,firstline=19,lastline=35,firstnumber=19}{05_mini_alu/test.sv}
+
+\textbf{The ports.} \cc{A0} to \cc{A7} go to the 7-segment display, \cc{B0} to
+\cc{B7} come from the DIP switch, as in Chapter~\ref{ch:step04}. \cc{BTN1}
+executes the instruction, \cc{BTN2} and \cc{BTN3} select the register that the
+display shows. New are the outputs \cc{LED1} to \cc{LED4} for the flags; they
+are four of the five LEDs on PMOD 2, next to the buttons.
+
+\textbf{Decoding the instruction.} Line 32 collects the switches into
+\cc{instr}, with \cc{B0} as the most significant bit \cc{instr[7]}. So the
+instruction reads in the order \cc{B0}, \dots, \cc{B7}, in the order in which
+we write it down. Line 35 then splits it. A concatenation on the \emph{left}
+side of an assignment (Chapter~\ref{ch:step03}) distributes the bits of the
+right side, from the left: \cc{op} gets \cc{instr[7:6]}, \cc{x} gets
+\cc{instr[5:4]}, \cc{y} gets \cc{instr[3:2]}, \cc{z} gets \cc{instr[1:0]}.
+This is exactly the \cc{Instruction} module of worksheet 4: a splitter,
+nothing but wires. The field XY needs no name of its own; where we need it, we
+write \cc{{x, y}}.
+
+\subsection*{The register file}
+
+\svpart{style=numbered,firstline=59,lastline=61,firstnumber=59}{05_mini_alu/test.sv}
+
+\textbf{An array of registers.} Line 61 declares an \term{array}: four
+elements \cc{register[0]} to \cc{register[3]}, each a vector of 8 bits. The
+range in front of the name, \cc{[7:0]}, gives the bits of one element; the
+size after the name, \cc{[4]}, gives the number of elements and is short for
+\cc{[0:3]}. (sv2v writes it like that: \cc{reg [7:0] register [0:3];}.)
+\cc{register[2]} is an 8-bit vector, and \cc{register[2][3:0]} is its low
+nibble. Like every \cc{logic}, the array says nothing yet about hardware. That
+follows from its use, and it is used in two ways.
+
+\textbf{Reading with a signal as index is a multiplexer.} In
+\cc{register[x]} the index is not a constant but the 2-bit signal \cc{x}. The
+expression stands for whichever of the four registers \cc{x} selects, that is,
+a 4:1 multiplexer for 8-bit words with select input \cc{x}. The design has
+three of these \term{read ports}: \cc{register[x]} for the first operand,
+\cc{register[addr2]} for the second, and \cc{register[{BTN3, BTN2}]} for the
+display. The register file of the course has two, plus the outputs
+\ccpct{%0} to \ccpct{%3} for its four displays.
+
+\textbf{The zero register.} Each read port is followed by an \cc{if} that
+replaces the value by 0 when the address is 0, for example
+\begin{lstlisting}
+b = register[addr2];
+if (addr2 == 2'b00) begin
+    b = 8'h00;
+end
+\end{lstlisting}
+(lines 103--106, the last assignment wins, Chapter~\ref{ch:step03}). This is
+the multiplexer of the course with a constant 0 at its input 0. Since no read
+port ever delivers \cc{register[0]}, and the write below skips it, nothing in
+the design depends on \cc{register[0]}, and yosys removes its flip-flops: as
+in the course, \ccpct{%0} has no storage.
+
+\textbf{Writing with a signal as index selects the register.} In the
+\cc{always_ff} block further down, \cc{register[z] <= s} says: at the edge, the
+register with number \cc{z} takes the new value, and the other registers keep
+theirs. In hardware, all flip-flops share one clock. Each register gets an
+\term{enable} input: at the edge, a flip-flop with enable takes over its data
+input only if the enable is 1, otherwise it keeps its value. A decoder computes
+the enables from \cc{z}: register $i$ is enabled exactly when
+$u(\mathtt{z}) = i$ (and, as we will see, \cc{exec} is 1). The
+demultiplexer of worksheet 6 does the same job by passing the clock edge only
+to the selected register. On an FPGA we do not switch clocks with logic, since
+a clock should arrive at all flip-flops at the same moment; the enable
+achieves the same result with a clean clock.
+
+\subsection*{The decoder}
+
+\svpart{style=numbered,firstline=63,lastline=86,firstnumber=63}{05_mini_alu/test.sv}
+
+This is the table of Section~\ref{sec:step05-course}, written as a
+\cc{case} in \cc{always_comb} (combinational logic, Chapter~\ref{ch:step03}).
+\cc{imm} is the \cc{data_in} of the course: \cc{{4'h0, x, y}} is
+\cc{ZeroExtend}, a concatenation with four zero bits on the left, and
+\cc{{x, y, 4'h0}} is \cc{LeftShift}, four zero bits on the right, so
+$u(\mathtt{\{x, y, 4'h0\}}) = u(\mathrm{XY}) \cdot 2^4$. Neither needs a
+single gate. \cc{addr2} is the \cc{addr2_out} of the course, \cc{sub} is
+\cc{add/sub}, and \cc{use_data1} is \cc{use_data1_out}. The \cc{default}
+branch covers Op = 10 and 11, which differ only in \cc{sub}. Every branch
+assigns both outputs, so no latch is needed (Chapter~\ref{ch:step03}).
+
+\subsection*{The adder/subtractor}
+
+\svpart{style=numbered,firstline=88,lastline=110,firstnumber=88}{05_mini_alu/test.sv}
+
+Lines 92--107 are the two operand multiplexers of
+Figure~\ref{fig:step05-datapath}, with the zero register built into the read
+ports. Lines 109 and 110 are the adder/subtractor of worksheet 4.
+
+\textbf{Replication.} \cc{{8{sub}}} is the bit \cc{sub} repeated eight
+times, a \term{replication}: eight wires connected to the same signal. So
+\cc{b ^ {8{sub}}} is a row of eight XOR gates, each with \cc{sub} at one
+input, and \cc{b_xor} is $b$ for an addition and $\neg b$ for a subtraction.
+
+\textbf{The carry-out.} The adder in line 110 has 9-bit operands: \cc{{1'b0,
+a}} puts a zero bit in front of \cc{a}, and \cc{{8'h00, sub}} is the carry-in
+as a 9-bit number. The 9-bit sum is split into its top bit \cc{cout} and the
+8 bits \cc{s}. So
+\[
+  2^8 \cdot \mathit{cout} + u(s) = u(a) + u(b \xor \mathit{sub}\cdots\mathit{sub})
+  + \mathit{sub},
+\]
+which for a subtraction is $u(a) + (2^8 - 1 - u(b)) + 1 = 2^8 + u(a) - u(b)$.
+Thus $u(s) = (u(a) - u(b)) \bmod 2^8$, the two's-complement subtraction of the
+course, and $\mathit{cout} = 1$ exactly when $u(a) \ge u(b)$. The \cc{+}
+operator describes the whole carry chain; we do not write out the full adders.
+
+\subsection*{The status flags}
+
+\svpart{style=numbered,firstline=112,lastline=127,firstnumber=112}{05_mini_alu/test.sv}
+
+The flip-flops \cc{ZF}, \cc{CF}, \cc{SF}, \cc{OF} are the
+\cc{Status-Flags-FF} of worksheet 6, and the expressions are those of
+worksheet 4:
+\begin{itemize}
+\item \cc{s == 8'h00} is a comparator with a constant, the NOR of all eight
+  bits of $s$;
+\item \cc{cout ^ sub} is CF. For an addition the carry-out says that the sum
+  does not fit into 8 bits. For a subtraction we just saw that the carry-out
+  is 1 exactly when there is \emph{no} borrow, $u(a) \ge u(b)$, so it has to be
+  inverted, which is the XOR trick once more;
+\item \cc{s[7]} is SF;
+\item for OF, \cc{b_xor[7]} is the sign bit of the operand that is actually
+  added, $b$ or $\neg b$. Signed overflow happens exactly when $a$ and this
+  operand are both negative and $s$ is not, or both non-negative and $s$ is
+  negative.
+\end{itemize}
+Line 127 shows the flags on the LEDs: \cc{LED1} is ZF, \cc{LED2} CF,
+\cc{LED3} SF and \cc{LED4} OF.
+
+Two details follow the course. First, the flags are stored for every executed
+instruction, also for Op = 00 and Op = 01: the adder is used for them too.
+After \cc{00001101}, which computes $3 + u(\%0) = 3 + 0$, all four flags are
+0. Second, the flags do not depend on the destination. The \cc{if (z !=
+2'b00)} only guards the write into the register file; the flags are assigned
+outside of it. An instruction with destination \ccpct{%0} computes $s$ as
+always, stores the flags, and discards $s$. This is the answer to the
+question of worksheet 6, and it follows from the circuit, not from a special
+rule.
+
+\textbf{The display} shows \cc{register[{BTN3, BTN2}]}, with 0 for
+\ccpct{%0}: with no button pressed \ccpct{%0}, with \cc{BTN2} \ccpct{%1},
+with \cc{BTN3} \ccpct{%2}, with both \ccpct{%3}. The module \cc{dev_hex} is
+the one of Chapter~\ref{ch:step03}.
+
+\begin{exercise}
+\label{ex:step05-decode}
+Which instruction computes $(u(\%2) - u(\%1)) \bmod 2^8 \to u(\%3)$? Write
+down the eight switch positions \cc{B0}, \dots, \cc{B7}. If \ccpct{%1} = 3 and
+\ccpct{%2} = 2, what does the display show for \ccpct{%3} afterwards, and
+which LEDs are on?
+\end{exercise}
+
+\begin{exercise}
+\label{ex:step05-flags}
+Write a program that puts \cc{80} (hexadecimal) into \ccpct{%1}, and then
+computes $(u(\%1) + u(\%1)) \bmod 2^8 \to u(\%1)$. Predict the register and
+the four flags after each instruction.
+\end{exercise}
+
+\section{The Button}
+\label{sec:step05-button}
+
+In the course, pressing the button produces the rising clock edge at which
+the Mini-ALU executes the instruction. On the board, the 12\,MHz clock
+\cc{CLK} is the only clock (Section~\ref{sec:step03-circuit}): all flip-flops
+of the design, those of \cc{dev_hex}, of the register file and of the flags,
+form one \term{clock domain}, the flip-flops driven by the same clock. The
+button produces a signal \cc{exec} instead, which is 1 for exactly one clock
+cycle per press, and the register file and the flags are enabled by it
+(line 115). For the Mini-ALU, a press is then exactly one rising edge of the
+course.
+
+Why not simply use \cc{BTN1} as the clock? In the solution of
+Exercise~\ref{ex:step02-button} we saw that a button is a bad clock: its
+contacts bounce and produce several edges per press. For the Mini-ALU this
+would mean that an instruction is sometimes executed several times.
+Executing \cc{00001101} twice puts 3 into \ccpct{%1} twice, which does no
+harm, but \cc{10011001}, $(u(\%1) + u(\%2)) \bmod 2^8 \to u(\%1)$, would add
+\ccpct{%2} two or three times. The same happens if we only synchronise the
+button and look for its rising edge, as Exercise~\ref{ex:step04-count}
+showed: each bounce is a rising edge. We need a debouncer.
+
+\svpart{style=numbered,firstline=37,lastline=57,firstnumber=37}{05_mini_alu/test.sv}
+
+This is the circuit of the solution of Exercise~\ref{ex:step04-count}:
+\begin{itemize}
+\item \cc{btn_s1} and \cc{btn_s2} are the synchroniser
+  (Section~\ref{sec:step04-button}). Only \cc{btn_s2} is used.
+\item \cc{btn} is the debounced button, the value we have accepted.
+  \cc{btn_cnt} is a 17-bit counter, which counts the cycles in which the
+  synchronised button differs from \cc{btn}, and is reset to 0 as soon as both
+  agree again. Only when they have differed for $2^{17}$ cycles in a row, that
+  is, when \cc{btn_cnt} reaches \cc{17'h1ffff} and \cc{btn_s2} still differs,
+  is the new value accepted. $2^{17}$ cycles at 12\,MHz are about 11\,ms,
+  longer than the bouncing of a button, and short enough that we do not notice
+  the delay. During the bouncing, the button keeps returning to its old value
+  for a moment, which resets the counter; so the counter only reaches its end
+  once the button is stable.
+\item \cc{exec} is set in the same cycle in which \cc{btn} changes, to the new
+  value. So it becomes 1 when a press is accepted, and not when a release is
+  accepted. The default assignment \cc{exec <= 0} sets it back to 0 one cycle
+  later.
+\end{itemize}
+As next-state functions, with $d = 1$ if \cc{btn_s2} $\ne$ \cc{btn} and $e = 1$
+if additionally $u(\mathit{btn\_cnt}) = 2^{17} - 1$:
+\[
+  \mathit{btn\_cnt}' = d \cdot \bigl((u(\mathit{btn\_cnt}) + 1) \bmod 2^{17}\bigr), \qquad
+  \mathit{btn}' = \mathit{btn} \xor e, \qquad
+  \mathit{exec}' = e \wedge \mathit{btn\_s2} .
+\]
+Loading a value and keeping it, as in step 04, needed none of this, because
+loading is idempotent (Section~\ref{sec:step04-button}). Executing an
+instruction is not.
+
+\begin{exercise}
+\label{ex:step05-debounce}
+How long after the button has stopped bouncing is the instruction executed?
+What happens if you press the button only for 5\,ms? And if you press it
+again 5\,ms after releasing it?
+\end{exercise}
+
+\section{What yosys Makes of It}
+\label{sec:step05-yosys}
+
+yosys first recognises the array as a \term{memory}, an array that is read and
+written with a signal as index. It then decides how to build it:
+
+\outputfile{step05_memory_map.txt}
+
+``FF mapping'' means flip-flops, as opposed to one of the block RAMs of the
+FPGA that we will meet in Chapter~\ref{ch:step07}. A block RAM would be far too
+large for 32 bits, and above all it cannot do what we need: it has one read
+port, and it delivers the data only after a clock edge. Our register file has
+three read ports that deliver their values at once. So yosys builds four 8-bit
+registers (``4 \$dff cells of width 8''), multiplexers for the read ports, and
+the write logic. Later it notices that nothing depends on \cc{register[0]} and
+removes it. After mapping to the building blocks of the iCE40:
+
+\outputfile{step05_yosys_stat.txt}
+
+(\cc{$scopeinfo} is bookkeeping about the module hierarchy, not hardware.)
+There are 62 flip-flops. The 28 \cc{SB_DFFE}, with enable, are the registers
+\ccpct{%1} to \ccpct{%3} (24) and the four flags, all enabled by \cc{exec}.
+The 18 \cc{SB_DFFSR}, with synchronous reset, are \cc{btn_cnt}, reset when
+the button agrees with \cc{btn}, and \cc{exec}. Of the 9 \cc{SB_DFF}, three
+are \cc{btn_s1}, \cc{btn_s2} and \cc{btn}, and six belong to \cc{dev_hex},
+as do the 7 \cc{SB_DFFESS} (Section~\ref{sec:step03-yosys}). Of the 26
+\cc{SB_CARRY}, 3 belong to the counter of \cc{dev_hex}, 15 to \cc{btn_cnt},
+and 8 to our adder/subtractor: one carry chain for all four operations, plus
+one for the carry-out \cc{cout}.
+
+nextpnr reports:
+
+\outputfile{step05_pnr.txt}
+
+One global buffer, since there is one clock. The slowest path runs from a
+register through a read multiplexer and the operand logic into the carry chain
+of the adder, and from its end back into a register: 21\,ns, so 47\,MHz, far
+above our 12\,MHz. The switches are not synchronised; they are read only in
+the cycle in which \cc{exec} is 1, and they do not change while we press the
+button.
+
+The DIP switch is on PMOD 1B, and \cc{icebreaker.pcf} names its eight pins
+\cc{B0} to \cc{B7}; the LEDs and buttons of PMOD 2 are \cc{LED1} to \cc{LED5}
+and \cc{BTN1} to \cc{BTN3}. So all 24 ports of \cc{test} have pins, and
+nextpnr places them without warnings (Section~\ref{sec:step02-pins}).
+
+\section{Simulation}
+\label{sec:step05-sim}
+
+The testbench \cc{tb_test.cpp} executes a program and checks every result.
+Each instruction comes with the predicted registers and flags:
+
+\cpppart{firstline=63,lastline=84}{05_mini_alu/tb_test.cpp}
+
+The first four instructions are the program of worksheet 4, the fifth is from
+worksheet 6, and the rest test the flags: the sixth is a subtraction with
+destination \ccpct{%0}, the eighth an addition with a signed overflow,
+$114 + 114 = 228$, which as a signed 8-bit number is $-28$.
+
+For each instruction, the testbench sets the switches and presses and releases
+\cc{BTN1} like a real button: the signal bounces four times within 2\,ms, and
+then stays for $2^{17} + 100$ clock cycles. As in Chapter~\ref{ch:step04}, the
+inputs change half a cycle before a rising edge. The testbench counts the
+cycles in which \cc{exec} is 1, which must be exactly one per instruction.
+Then it reads the four registers the way we do on the board: it sets
+\cc{BTN2} and \cc{BTN3} and looks at the value \cc{hex_val} that \cc{dev_hex}
+displays. To look at signals inside the design, the testbench includes the
+header \cc{Vtest___024root.h}; then \cc{dut->rootp->test__DOT__exec} is the
+signal \cc{exec} of the module \cc{test}, and
+\cc{test__DOT__dev_hex0__DOT__hex_val} is \cc{hex_val} in the instance
+\cc{dev_hex0}. The flags it reads from the outputs \cc{LED1} to \cc{LED4}.
+
+\outputfile{step05_make_sim.txt}
+
+Before an instruction writes them, \ccpct{%2} and \ccpct{%3} show
+\cc{2F}: the simulation gives flip-flops without an initial value a random
+value; on the board they start with 0. Those values are not checked. (The random values need the line
+\cc{Verilated::commandArgs(argc, argv);} in the testbench, see
+Appendix~\ref{app:tools}.) The simulation runs for about three million clock
+cycles, a quarter of a second of the board, and takes less than a second. To
+keep the waveform file small, the testbench writes only the first 20 cycles
+of each press and each release, and the 20 cycles after each \cc{exec}, into
+\cc{waveform.vcd}.
+
+\begin{exercise}
+\label{ex:step05-zero}
+In the program above, \cc{11100100} has destination \ccpct{%0} and still sets
+CF and SF. How would you change \cc{test.sv} so that an instruction with
+destination \ccpct{%0} leaves the flags alone? Why is it useful that it does
+not? Hint: think of comparing two registers.
+\end{exercise}
+
+\section{What Is Still Missing}
+
+The Mini-ALU executes one instruction per button press, and we have to set
+every instruction by hand. A computer fetches its instructions from a memory,
+and to get a program into that memory, we need a way to talk to the board from
+our computer. The next step does this: it connects the FPGA to the serial line
+of the USB chip. The register file comes back in Chapter~\ref{ch:step09}, with
+sixteen registers of 64 bits instead of four of eight, and again with a zero
+register.
+
+\solutions
+
+\solution
+We need Op = 11, X = 10, Y = 01 and Z = 11, so the instruction is
+\cc{11100111}: \cc{B0} = 1, \cc{B1} = 1, \cc{B2} = 1, \cc{B3} = 0, \cc{B4} =
+0, \cc{B5} = 1, \cc{B6} = 1, \cc{B7} = 1. With \ccpct{%1} = 3 and \ccpct{%2}
+= 2 it computes $(2 - 3) \bmod 256 = 255$, so the display shows \cc{FF} for
+\ccpct{%3}. ZF = 0. The adder computes $2 + 252 + 1 = 255$ without carry-out,
+so there is a borrow and CF = 1. SF = 1. OF = 0: $a = 2$ is non-negative and
+the added operand $\neg b$ = \cc{11111100} is negative, and the sum of two
+numbers with different signs never overflows. So \cc{LED2} and \cc{LED3} are
+on.
+
+\solution
+\cc{00000001} loads 0 into \ccpct{%1} (ZF = 1, since the sum is 0, and the
+other flags 0), \cc{01100001} adds
+$u(1000) \cdot 2^4 = 128$, so \ccpct{%1} = \cc{80} (ZF = 0, CF = 0, SF = 1, OF =
+0: $0 + (-128)$ does not overflow). Then \cc{10010101} computes
+$128 + 128 = 256$, so \ccpct{%1} = \cc{00}, with ZF = 1, CF = 1 (unsigned
+overflow), SF = 0 and OF = 1: two negative operands, $-128 + (-128) = -256$,
+give a non-negative result. (If \ccpct{%1} was 0 already, the first
+instruction is not needed.) Putting the three instructions with these
+predictions into the table of the testbench confirms them.
+
+\solution
+\cc{btn} changes when the synchronised button has differed from it for
+$2^{17}$ cycles in a row, so the instruction is executed about $2^{17}$
+cycles, 11\,ms, after the last bounce. (A few cycles more: two for the
+synchroniser, and \cc{exec} is a register itself. In the simulation, \cc{exec}
+is 1 exactly $2^{17} + 2$ cycles after the last change of \cc{BTN1}.) A press of 5\,ms is ignored: the counter is reset when the button is
+released, before it reaches its end. A press 5\,ms after a release is also
+ignored: the release has not been accepted yet, \cc{btn} is still 1, and the
+new press only means that the button agrees with \cc{btn} again. On the
+board, both are far shorter than a normal press.
+
+\solution
+Move the four flag assignments into the \cc{if (z != 2'b00)} block. But an
+instruction that computes flags and discards its result is useful:
+\cc{11011000}, for example, computes $u(\%1) - u(\%2)$ and only keeps the
+flags. Afterwards ZF says whether the registers are equal and CF whether
+$u(\%1) < u(\%2)$, without destroying a register. Many processors have such a
+\emph{compare} instruction, and with a zero register we get it for free, as
+worksheet 6 points out.

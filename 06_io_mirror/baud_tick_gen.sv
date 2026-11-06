@@ -21,8 +21,8 @@
  * This module generates a bit baud tick multiplied by the oversampling parameter.
  */
 module baud_tick_gen(
-	input clk, enable,
-	output tick);
+        input clk, enable,
+        output tick);
 parameter clk_freq = 12000000;
 parameter baud = 115200;
 parameter oversampling = 1;

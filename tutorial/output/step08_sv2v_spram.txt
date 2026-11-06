@@ -1,0 +1,23 @@
+module SB_SPRAM256KA (
+	ADDRESS,
+	DATAIN,
+	MASKWREN,
+	WREN,
+	CHIPSELECT,
+	CLOCK,
+	STANDBY,
+	SLEEP,
+	POWEROFF,
+	DATAOUT
+);
+	input [13:0] ADDRESS;
+	input [15:0] DATAIN;
+	input [3:0] MASKWREN;
+	input WREN;
+	input CHIPSELECT;
+	input CLOCK;
+	input STANDBY;
+	input SLEEP;
+	input POWEROFF;
+	output reg [15:0] DATAOUT;
+endmodule

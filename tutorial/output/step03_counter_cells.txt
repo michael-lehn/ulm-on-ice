@@ -1,0 +1,14 @@
+SB_DFFE  C=CLK, D=d[0], E=tic, Q=hex_val[0]
+SB_LUT4  I0=0, I1=0, I2=0, I3=hex_val[0], O=d[0]  LUT_INIT=0000000011111111
+SB_DFFE  C=CLK, D=d[1], E=tic, Q=hex_val[1]
+SB_LUT4  I0=0, I1=0, I2=hex_val[1], I3=hex_val[0], O=d[1]  LUT_INIT=0110100110010110
+SB_DFFE  C=CLK, D=d[2], E=tic, Q=hex_val[2]
+SB_LUT4  I0=0, I1=0, I2=hex_val[2], I3=c[2], O=d[2]  LUT_INIT=0110100110010110
+SB_CARRY CI=hex_val[0], CO=c[2], I0=0, I1=hex_val[1]
+SB_DFFE  C=CLK, D=d[3], E=tic, Q=hex_val[3]
+SB_LUT4  I0=0, I1=0, I2=hex_val[3], I3=c[3], O=d[3]  LUT_INIT=0110100110010110
+SB_CARRY CI=c[2], CO=c[3], I0=0, I1=hex_val[2]
+...
+SB_DFFE  C=CLK, D=d[7], E=tic, Q=hex_val[7]
+SB_LUT4  I0=0, I1=0, I2=hex_val[7], I3=c[7], O=d[7]  LUT_INIT=0110100110010110
+SB_CARRY CI=c[6], CO=c[7], I0=0, I1=hex_val[6]

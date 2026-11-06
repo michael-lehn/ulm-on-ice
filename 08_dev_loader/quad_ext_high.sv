@@ -19,25 +19,25 @@ module quad_ext_high (
 );
 
     always_comb begin
-	case (data_type)
-	    default:
-		data_out = data_in;
-	    RAM_LONG:
-		data_out = {
-		    {RAM_QUAD_SIZE-RAM_LONG_SIZE{1'b0}},
-		    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_LONG_SIZE]
-		};
-	    RAM_WORD:
-		data_out = {
-		    {RAM_QUAD_SIZE-RAM_WORD_SIZE{1'b0}},
-		    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_WORD_SIZE]
-		};
-	    RAM_BYTE:
-		data_out = {
-		    {RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}},
-		    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_BYTE_SIZE]
-		};
-	endcase
+        case (data_type)
+            default:
+                data_out = data_in;
+            RAM_LONG:
+                data_out = {
+                    {RAM_QUAD_SIZE-RAM_LONG_SIZE{1'b0}},
+                    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_LONG_SIZE]
+                };
+            RAM_WORD:
+                data_out = {
+                    {RAM_QUAD_SIZE-RAM_WORD_SIZE{1'b0}},
+                    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_WORD_SIZE]
+                };
+            RAM_BYTE:
+                data_out = {
+                    {RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}},
+                    data_in[RAM_QUAD_SIZE-1:RAM_QUAD_SIZE-RAM_BYTE_SIZE]
+                };
+        endcase
     end
 
 endmodule

@@ -1,0 +1,4 @@
+$ verilator --binary -Wno-fatal rinit_tb.sv --top-module tb
+...
+$ ./obj_dir/Vtb
+a=1 b=1 r=0

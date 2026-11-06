@@ -5,6 +5,7 @@
 interface if_instr_bus;
     pkg_bus::op_t op;
     pkg_ram::data_type_t data_type;
+    logic sign_ext;     // sign extend a fetched byte
     logic [pkg_reg::REG_ADDRW-1:0] data_reg;
     logic [pkg_reg::REG_ADDRW-1:0] addr_reg;
     /* verilator lint_off UNUSEDSIGNAL */
@@ -12,19 +13,21 @@ interface if_instr_bus;
     /* verilator lint_on UNUSEDSIGNAL */
 
     modport server(
-	input op,
-	input data_type,
-	input data_reg,
-	input addr_reg,
-	input addr_offset
+        input op,
+        input data_type,
+        input sign_ext,
+        input data_reg,
+        input addr_reg,
+        input addr_offset
     );
     
     modport client(
-	output op,
-	output data_type,
-	output data_reg,
-	output addr_reg,
-	output addr_offset
+        output op,
+        output data_type,
+        output sign_ext,
+        output data_reg,
+        output addr_reg,
+        output addr_offset
     );
 
 endinterface

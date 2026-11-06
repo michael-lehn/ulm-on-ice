@@ -24,37 +24,34 @@ main(int argc, char **argv, char **env)
 
     std::size_t numCh = 0;
 
+    // A7 is digit_sel of dev_hex: it must change while the display is
+    // multiplexed (twice every 32 clock cycles).
+    int digit_sel = -1;
+    int digit_switches = 0;
+
     while (sim_time < MAX_SIM_TIME) {
-	dut->CLK ^= 1;
+        dut->CLK ^= 1;
 
-	if (dut->CLK == 1) {
-	    posedge_cnt++;
+        if (dut->CLK == 1) {
+            posedge_cnt++;
+        }
+        dut->eval();
 
-	    switch (posedge_cnt) {
-		case 5:
-		    dut->BTN1 = 1;
-		    dut->BTN2 = 0;
-		    break;
-		case 8:
-		    dut->BTN1 = 1;
-		    dut->BTN2 = 1;
-		    break;
-		case 11:
-		    dut->BTN1 = 0;
-		    dut->BTN2 = 1;
-		    break;
-		default:
-		    dut->BTN1 = 0;
-		    dut->BTN2 = 0;
-	    }
-	}
-	dut->eval();
+        if (dut->CLK == 1) {
+            if (digit_sel >= 0 && dut->A7 != digit_sel) {
+                digit_switches++;
+            }
+            digit_sel = dut->A7;
+        }
 
-	m_trace->dump(sim_time);
-	sim_time++;
+        m_trace->dump(sim_time);
+        sim_time++;
     }
+
+    std::cout << "changes of digit_sel in " << posedge_cnt
+              << " clock cycles: " << digit_switches << std::endl;
 
     m_trace->close();
     delete dut;
-    exit(EXIT_SUCCESS);
+    exit(digit_switches > 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

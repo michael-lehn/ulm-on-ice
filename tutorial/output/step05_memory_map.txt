@@ -1,0 +1,9 @@
+2.35. Executing MEMORY_LIBMAP pass (mapping memories to cells).
+using FF mapping for memory test.register
+...
+2.39. Executing MEMORY_MAP pass (converting memories to logic and flip-flops).
+...
+Mapping memory \register in module \test:
+  created 4 $dff cells and 0 static cells of width 8.
+  read interface: 0 $dff and 9 $mux cells.
+  write interface: 4 write mux blocks.

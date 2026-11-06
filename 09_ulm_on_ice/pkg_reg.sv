@@ -11,7 +11,7 @@ typedef enum {
 
 typedef enum {
     REG_READ_ONLY,
-    REG_WRITE	    // read and write
+    REG_WRITE       // read and write
 } op_t;
 
 endpackage // pkg_reg

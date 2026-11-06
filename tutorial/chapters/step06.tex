@@ -1,0 +1,542 @@
+\chapter{Step 06: The Serial Line}
+\label{ch:step06}
+
+% Listings with line numbers, for listings whose lines the text refers to.
+\lstdefinestyle{numbered}{numbers=left,numberstyle=\tiny\color{codecomment},numbersep=6pt}
+
+So far the board has talked to us through LEDs and a display, and we have
+talked to it through buttons and switches. To load programs, we need a real
+connection to the computer. Step 06 uses the serial line that the USB chip
+provides (Section~\ref{sec:board}). The design of \cc{06_io_mirror} receives
+every character we type in a terminal, shows its code on the display, and
+sends it back. So what we see in the terminal is what the FPGA sent. On the
+way we meet a lot of new SystemVerilog: modules with \cc{parameter}s, state
+machines with \cc{typedef enum}, a \cc{function}, and a trap that the
+synthesis tool does not let us fall into.
+
+\section{Sending Bits One After the Other}
+\label{sec:step06-uart}
+
+The serial line has two wires, one for each direction. In
+\cc{icebreaker.pcf} they are called \cc{RX} (pin 6, from the computer to the
+FPGA) and \cc{TX} (pin 9, from the FPGA to the computer), named from the
+FPGA's point of view. The circuit that sends and receives on such a line is
+called a \term{UART}, a \emph{universal asynchronous receiver/transmitter}.
+
+\emph{Asynchronous} means: there is no clock wire. Sender and receiver only
+agree on the \term{baud rate}, the number of bits per second. Ours is
+9600\,baud, so one bit lasts $1/9600\,\mathrm{s} \approx 104.2\,\mu\mathrm{s}$,
+which is $12\,000\,000 / 9600 = 1250$ cycles of our 12\,MHz clock. Each side
+measures this time with its own clock.
+
+One byte is sent as a \term{frame} (Figure~\ref{fig:step06-frame}):
+\begin{itemize}
+\item When nothing is sent, the line is \emph{idle} and stays at 1.
+\item A \term{start bit}, a 0, announces a frame. Its falling edge is the
+  moment from which the receiver measures time.
+\item Then come the 8 data bits, the \emph{least} significant bit first.
+\item A \term{stop bit}, a 1, ends the frame. Our transmitter sends two of
+  them; a receiver needs only one, the second simply looks like idle line.
+\end{itemize}
+A frame with one stop bit takes 10 bit times, ours 11. The receiver samples
+each bit in its middle, where it is furthest from both of its edges. Since the
+two clocks are never exactly equal, the sample points drift; but if the baud
+rates of both sides differ by a few percent at most, the last sample of a
+frame, about $9.5$ bit times after the falling edge, is still well inside its
+bit. The next frame starts with a new falling edge, so the error does not
+accumulate from frame to frame.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=9.5mm,y=5mm]
+  % bits of 'A' = 0x41, LSB first
+  \def\lo{0} \def\hi{1}
+  \draw[black!15] (0,0) -- (13,0);
+  \draw[signal] (0,1) -- (1,1) -- (1,0) -- (2,0) -- (2,1) -- (3,1) -- (3,0)
+     -- (8,0) -- (8,1) -- (9,1) -- (9,0) -- (10,0) -- (10,1) -- (13,1);
+  \foreach \x/\lab in {1/start,2/$d_0$,3/$d_1$,4/$d_2$,5/$d_3$,6/$d_4$,7/$d_5$,8/$d_6$,9/$d_7$,10/stop,11/stop} {
+    \draw[black!25] (\x,-0.4) -- (\x,1.6);
+    \node[font=\scriptsize] at (\x+0.5,1.9) {\lab};
+  }
+  \draw[black!25] (12,-0.4) -- (12,1.6);
+  \foreach \x/\v in {1/0,2/1,3/0,4/0,5/0,6/0,7/0,8/1,9/0,10/1,11/1} {
+    \node[font=\scriptsize\ttfamily] at (\x+0.5,-0.8) {\v};
+  }
+  \foreach \x in {1,...,10} { \fill[green!45!black] (\x+0.5,0.5) circle (1.2pt); }
+  \node[font=\scriptsize,anchor=east] at (0,0.5) {\cc{TX}};
+  \node[note] at (0.5,1.9) {idle};
+  \node[note] at (12.5,1.9) {idle};
+  \draw[decorate,decoration={brace,mirror,amplitude=3pt}] (1,-1.4) -- (2,-1.4)
+     node[midway,below=2pt,note] {1250 cycles};
+\end{tikzpicture}
+\caption{The frame for the character \cc{A}, code $\mathtt{41}_{16} =
+\mathtt{01000001}_2$, as \cc{uart_tx} sends it: start bit, the data bits
+$d_0$ to $d_7$ starting with the least significant, two stop bits. The dots
+mark where a receiver samples.}
+\label{fig:step06-frame}
+\end{figure}
+
+\section{The Top Module}
+\label{sec:step06-top}
+
+The top module \cc{test.sv} connects a receiver \cc{uart_rx}, a transmitter
+\cc{uart_tx} and \cc{dev_hex}, and controls them with a small state machine.
+Its first part declares the signals between them:
+
+\svpart{style=numbered,firstline=1,firstnumber=1,lastline=33}{06_io_mirror/test.sv}
+
+The comments \cc{/* verilator lint_off UNUSEDSIGNAL */} and \cc{lint_on} tell
+Verilator not to warn that \cc{rx_idle} and \cc{rx_eop} are never read. The
+receiver provides them, and we do not need them.
+
+\textbf{\cc{typedef enum} names the states.} Lines 26 to 31 define a new type
+\cc{state_t} whose values have names: \cc{IO_READY_TO_RECEIVE},
+\cc{IO_BUFFERING_DATA}, and so on. The names stand for the numbers 0, 1, 2,
+3, in this order. Line 33 declares two signals of this type, \cc{state} with
+the power-up value \cc{IO_READY_TO_RECEIVE} and \cc{next_state}. As with
+\cc{logic}, the type says nothing about the hardware; that \cc{state} becomes a
+register follows from the \cc{always_ff} block that assigns it. What the
+\cc{enum} gives us is readability: we write the name of a state instead of a
+number, and a simulator shows the names in the waveform.
+
+How many bits does \cc{state} have? Without further information, an
+\cc{enum} is based on the type \cc{int}, which has 32 bits. sv2v writes
+\cc{reg [31:0] state}. yosys finds that the upper 30 bits are always 0 and
+removes their flip-flops, but we will see in
+Section~\ref{sec:step06-latch} that the 32 bits still matter.
+
+\subsection*{A state machine}
+
+A \term{state machine} is a register, the \emph{state}, together with
+combinational logic that computes the next state from the current state and
+the inputs. We have seen the smallest example in Chapter~\ref{ch:step02}.
+Here the description is split into three blocks:
+
+\svpart{style=numbered,firstline=35,firstnumber=35,lastline=71}{06_io_mirror/test.sv}
+
+The \cc{always_comb} block says which state follows which: a combinational
+circuit from \cc{state} to \cc{next_state}, here simply the successor in a
+cycle of four. The \cc{always_ff} block is the state register. In some states
+it takes over \cc{next_state} only under a condition, and if the condition is
+false it keeps its value. As a circuit, this is a register with enable, where
+the enable is 1 in \cc{IO_READY_TO_RECEIVE} if \cc{rx_ready} is 1, in
+\cc{IO_BUFFERING_DATA} if \cc{tx_busy} is 0, and in the other two states
+always. Figure~\ref{fig:step06-fsm} shows the result as a state diagram.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=12mm and 44mm,
+    st/.style={box,fill=blue!7,minimum width=38mm,minimum height=8mm,font=\footnotesize}]
+  \node[st] (r) {\cc{IO_READY_TO_RECEIVE}};
+  \node[st,right=of r] (b) {\cc{IO_BUFFERING_DATA}};
+  \node[st,below=of b] (i) {\cc{IO_INIT_TRANSMISSION}};
+  \node[st,below=of r] (s) {\cc{IO_STARTED_TRANSMISSION}};
+  \draw[arrow] (r) -- node[above,note]{\cc{rx_ready}} node[below,note]{\cc{data_buf <= rx_data_out}} (b);
+  \draw[arrow] (b) -- node[right,note]{\cc{!tx_busy}} (i);
+  \draw[arrow] (i) -- node[above,note]{always} node[below,note]{\cc{tx_start <= 1}} (s);
+  \draw[arrow] (s) -- node[left,note]{always}  node[right,note]{\cc{tx_start <= 0}} (r);
+\end{tikzpicture}
+\caption{The state machine of \cc{06_io_mirror/test.sv}. An arrow is taken at a
+rising edge of \cc{CLK} if its condition holds; otherwise the state stays. The
+assignments below the arrows are made at the same edge.}
+\label{fig:step06-fsm}
+\end{figure}
+
+The third block describes what happens in each state:
+
+\svpart{style=numbered,firstline=73,firstnumber=73,lastline=94}{06_io_mirror/test.sv}
+
+It describes three registers with enable: \cc{data_buf} loads the received
+byte when \cc{rx_ready} is 1 in the first state; \cc{tx_data_in} and
+\cc{tx_start} change in the last two states. A state that is not mentioned,
+or the empty statement \cc{;}, means: the register keeps its value.
+
+Together: the receiver signals a byte with \cc{rx_ready}, which is 1 for
+exactly one clock cycle. At that edge, the byte goes into \cc{data_buf}, and
+the machine moves to \cc{IO_BUFFERING_DATA}. There it waits until the
+transmitter is free. In \cc{IO_INIT_TRANSMISSION} it hands the byte to the
+transmitter and sets \cc{tx_start}, which is 1 during the one cycle in
+\cc{IO_STARTED_TRANSMISSION} and is cleared at the edge back to the first
+state. So the transmitter sees a start pulse of one cycle. The display shows
+\cc{data_buf}, the last byte received.
+
+\begin{exercise}
+\label{ex:step06-next}
+Change one line of \cc{test.sv} so that the board answers each character with
+the next one in the code table: \cc{a} with \cc{b}, \cc{A} with \cc{B}.
+\end{exercise}
+
+\section{Parameters}
+\label{sec:step06-parameter}
+
+The last part of \cc{test.sv} creates the receiver and the transmitter:
+
+\svpart{style=numbered,firstline=96,firstnumber=96,lastline=120}{06_io_mirror/test.sv}
+
+Between the module name and the instance name stands a list
+\texttt{\#(\,\dots)}: values for the \term{parameters} of the module. In
+\cc{uart_rx.sv} they are declared as
+\begin{lstlisting}
+parameter clk_freq = 12000000;
+parameter baud = 115200;
+parameter oversampling = 8;
+\end{lstlisting}
+A \cc{parameter} is a constant of the module, like a \cc{localparam}
+(Chapter~\ref{ch:step03}), with one difference: each instance may replace its
+value. The numbers after \cc{=} are only defaults. Here \cc{.baud(BAUD)} sets
+\cc{baud} to 9600 for both instances, \cc{oversampling} keeps its default.
+Parameters can also be given by position, in the order of their declaration;
+\cc{uart_rx} does that when it creates its tick generator:
+\begin{lstlisting}
+baud_tick_gen #(clk_freq, baud, oversampling) tickgen(.clk(clk), .enable(1'b1), .tick(os_tick));
+\end{lstlisting}
+
+A parameter is not a wire. It is a number that is fixed when the design is
+synthesised, and it changes the circuit itself: other values give other
+widths and other constants, so each set of parameter values describes a
+different circuit. yosys builds a separate module for each set, with a name
+derived from the values. The per-module statistics of \cc{make report}
+(Appendix~\ref{app:tools}) list them:
+
+\outputfile{step06_paramod.txt}
+
+There are two versions of \cc{baud_tick_gen}, one with oversampling 8 for the
+receiver and one with oversampling 1 for the transmitter.
+
+\textbf{A note on style.} \cc{uart_rx.sv}, \cc{uart_tx.sv} and \cc{baud_tick_gen.sv} come from the
+iCEBreaker examples of Piotr Esden-Tempski and are written in the older
+Verilog style. \cc{reg} and \cc{wire} are the predecessors of \cc{logic}, and
+\cc{always @(posedge clk)} with \cc{<=} is what we write as \cc{always_ff}, as
+in \cc{dev_hex} (Chapter~\ref{ch:step03}). Ports without a type, such as
+\cc{input clk}, are single wires. It describes the same kind of hardware; only
+the tools no longer check that an \cc{always} block really describes
+flip-flops.
+
+\section{Baud Ticks from \texorpdfstring{12\,MHz}{12 MHz}}
+\label{sec:step06-baud}
+
+Both the transmitter and the receiver need a signal that is 1 for one clock
+cycle, at the baud rate (transmitter) or at eight times the baud rate
+(receiver). For 9600\,baud a counter to 1250 would do, but for eight times
+9600 we would need $12\,000\,000 / 76\,800 = 156.25$ cycles, and for 115200\,baud
+$104.17$. \cc{baud_tick_gen} solves this for all rates at once:
+
+\svpart{style=numbered,firstline=23,firstnumber=23,lastline=48}{06_io_mirror/baud_tick_gen.sv}
+
+\textbf{The circuit} is in lines 39, 45 and 46: a register \cc{acc} of $w + 1$
+bits, where $w$ is \cc{acc_width}, and an adder. In each cycle, the low $w$
+bits of \cc{acc} plus the constant \cc{inc} are stored back; the top bit
+\cc{acc[w]} receives the carry-out of this $w$-bit addition, and it is the
+output \cc{tick}. Mathematically, with $a_n$ the value of the low $w$ bits
+after $n$ cycles,
+\[
+  a_{n+1} = (a_n + \mathit{inc}) \bmod 2^w, \qquad
+  \mathit{tick}_{n+1} = 1 \iff a_n + \mathit{inc} \ge 2^w .
+\]
+So $a_n = n \cdot \mathit{inc} \bmod 2^w$ (starting from 0), and the number of
+ticks in the first $n$ cycles is $\lfloor n \cdot \mathit{inc} / 2^w \rfloor$.
+At a clock of $f$\,Hz this gives on average
+\[
+  f \cdot \frac{\mathit{inc}}{2^w}
+\]
+ticks per second. Since $\mathit{inc} < 2^w$, at most one tick comes per
+cycle, and the gap between two ticks is either $\lfloor 2^w /
+\mathit{inc}\rfloor$ or $\lceil 2^w / \mathit{inc}\rceil$ cycles. Such a
+circuit is called a \term{phase accumulator}, or a fractional divider: it
+divides the clock by the fraction $2^w / \mathit{inc}$.
+
+\textbf{The constants.} To get $o \cdot b$ ticks per second for baud rate $b$
+and oversampling $o$, we need $\mathit{inc} \approx o \cdot b \cdot 2^w / f$,
+rounded. The larger $w$, the smaller the rounding error. Line 37 sets $w$ to 8
+more than the number of binary digits of $f / b$. Line 42 computes the rounded
+value of $o \cdot b \cdot 2^w / f$ in integer arithmetic: adding half the
+divisor, \cc{clk_freq >> (shiftlimiter + 1)}, before the division turns
+truncation into rounding, and \cc{shiftlimiter} shifts numerator and
+denominator so that the intermediate values stay below $2^{31}$. If we
+uncomment the \cc{$display} in line 43, the simulation prints the values for
+our two instances:
+
+\outputfile{step06_baud_inc.txt}
+
+For the transmitter, $w = 19$ and $\mathit{inc} = 419$, so
+\[
+  12\,000\,000 \cdot \frac{419}{2^{19}} \approx 9590.1\ \text{ticks per second},
+\]
+about 0.1\,\% slower than 9600; a bit lasts 1251 or 1252 cycles instead of 1250.
+For the receiver, $\mathit{inc} = 3355$ gives $76\,789.9$ instead of $76\,800$,
+an error of $0.013\,\%$. Both are far inside the tolerance of a UART.
+
+\textbf{A function computed by the tools.} \cc{log2_} in lines 31 to 34 is a
+\cc{function}: it takes an integer and returns one. Here it is only used in
+\cc{localparam}s, so it is evaluated by the tools, during synthesis, and it
+describes \emph{no} circuit at all. Its \cc{while} loop is a loop in yosys,
+not in hardware. (A function applied to signals would describe combinational
+logic; we will not need that.) Despite its name, \cc{log2_(v)} is not
+$\log_2 v$: it counts the binary digits of $v$, that is, $\lfloor \log_2 v
+\rfloor + 1$ for $v \ge 1$. For example, $f/b = 1250$ has 11 binary digits,
+so $w = 19$.
+
+\textbf{The enable.} If \cc{enable} is 0, line 45 sets \cc{acc} to \cc{inc}.
+The transmitter connects \cc{enable} to \cc{tx_busy}, so its tick generator
+starts afresh with every frame, and the first tick comes one bit time after
+the transmission starts. The receiver's tick generator always runs.
+
+\begin{exercise}
+\label{ex:step06-baud}
+With the default parameters (12\,MHz, 115200\,baud, no oversampling), compute
+\cc{acc_width}, \cc{shiftlimiter} and \cc{inc}, and the actual tick rate. How
+large is the relative error?
+\end{exercise}
+
+\section{The Transmitter}
+\label{sec:step06-tx}
+
+\svpart{style=numbered,firstline=27,firstnumber=27,lastline=49}{06_io_mirror/uart_tx.sv}
+
+The states of the transmitter are not an \cc{enum} but \cc{localparam}s with
+codes chosen by hand. The choice is clever: the eight data states have bit 3
+set and the number of the data bit in bits 2 to 0, the states in which the
+line is 1 (\cc{IDLE}, \cc{BIT_STOP1}, \cc{BIT_STOP2}) are the codes below 4,
+and \cc{BIT_START} is 4. This makes the output logic small:
+
+\svfile[style=numbered,firstline=51,firstnumber=51,lastline=82]{06_io_mirror/uart_tx.sv}
+
+\cc{tx_shift} is a \term{shift register}: when the transmitter is idle and
+\cc{tx_start} is 1, it loads the byte; in each data state it shifts right by
+one at every \cc{bit_tick}. So \cc{tx_shift[0]} is always the bit to be sent,
+first $d_0$, then $d_1$, and so on: least significant bit first. The state
+moves on at every \cc{bit_tick}. In line 82, \cc{tx_state < 4} is 1 in idle
+and in the stop bits, \cc{tx_state[3] & tx_shift[0]} is the data bit in the
+data states, and in \cc{BIT_START} both are 0. The codes 1, 5, 6 and 7 are
+not used, and the \cc{default} branch leads from them back to \cc{IDLE}.
+
+\section{The Receiver}
+\label{sec:step06-rx}
+
+Receiving is harder: the receiver has to find the start of a frame and the
+middle of each bit by itself. It does that by looking at the line eight
+times per bit, at each \cc{os_tick} of its tick generator. This is called
+\term{oversampling}.
+
+\svpart{style=numbered,firstline=55,firstnumber=55,lastline=80}{06_io_mirror/uart_rx.sv}
+
+\textbf{Synchronising.} \cc{RX} changes whenever the computer sends, without
+any relation to our clock. A flip-flop whose input changes just at the clock
+edge may need unusually long to settle on 0 or 1. The two flip-flops
+\cc{rx_sync} in series give it a whole sampling period to settle before the
+value is used. This is the standard way to bring an outside signal into a
+clocked design.
+
+\textbf{Filtering.} \cc{filter_cnt} is a 2-bit counter that counts up while
+the line is 1 and down while it is 0, stopping at 3 and 0. \cc{rx_bit} only
+changes when the counter reaches 3 or 0, that is, when the line had the new
+value for three samples in a row. Short glitches are ignored.
+
+\svfile[style=numbered,firstline=92,firstnumber=92,lastline=125]{06_io_mirror/uart_rx.sv}
+
+\textbf{Finding the middle of a bit.} \cc{os_cnt} has \cc{l2o-1} bits;
+\cc{log2(8)} counts the binary digits of 8, which gives 4, so \cc{os_cnt} has
+3 bits and counts the oversampling ticks modulo 8. In \cc{IDLE} it is held at
+0: \cc{c ? a : b} is the \term{conditional operator}, a 2:1 multiplexer that
+selects \cc{a} if \cc{c} is 1 and \cc{b} otherwise. When the filtered line falls to 0, the start bit has begun, and the state
+machine goes to \cc{BIT_START}. Now \cc{os_cnt} counts, and \cc{sample_now}
+is 1 at the tick on which \cc{os_cnt} is 3: about half a bit after the falling
+edge, and from then on every 8 ticks, one bit later. Each \cc{sample_now}
+advances the state, and in the eight data states (bit 3 of the state set) the
+filtered bit is shifted into \cc{rx_data} from the left. After eight shifts,
+the first bit received, $d_0$, has arrived at position 0. The delay of the
+synchroniser and the filter does not matter: it delays the falling edge and
+all data bits alike.
+
+\svpart{style=numbered,firstline=128,firstnumber=128,lastline=132}{06_io_mirror/uart_rx.sv}
+
+At the sample point of the stop bit, \cc{rx_ready} becomes 1 for one cycle if
+the stop bit is 1; a frame without a valid stop bit is dropped. Since
+\cc{sample_now} is 1 for one cycle, so is \cc{rx_ready}, as the comment says.
+The rest of \cc{uart_rx.sv} measures pauses between bytes for
+\cc{rx_idle} and \cc{rx_eop}, which we do not use.
+
+\section{A Latch from an Incomplete case}
+\label{sec:step06-latch}
+
+An earlier version of \cc{test.sv} had no \cc{default} branch in the
+\cc{always_comb} block of the state machine. With this version, yosys stops:
+
+\outputfile{step06_latch.txt}
+
+What is a latch doing here? An \cc{always_comb} block must say, for every
+possible value of its inputs, what its outputs are. If there is an input value
+for which \cc{next_state} is not assigned, then \cc{next_state} must keep its
+previous value for that input. A circuit without clock that keeps a value is a
+\term{latch}: level-sensitive storage, the D latch of the course. On an FPGA
+it has to be built from LUTs with feedback, its timing is hard to analyse, and
+it is almost never what we wanted. \cc{synth_ice40} therefore aborts by
+default (its option \cc{-latches} has the default \cc{error}); with
+\cc{-latches warn} it would only warn and build the latch from LUTs.
+
+But the \cc{case} lists all four states. Why is it incomplete? Because
+\cc{state} has 32 bits, as we saw: the \cc{case} covers four of its $2^{32}$
+values. That only these four occur is a property of our state machine, not of
+the circuit that computes \cc{next_state}, and yosys builds that circuit for
+all inputs. (Verilator, which knows that an \cc{enum} variable holds one of its
+values, does not complain. Simulator and synthesis tool look at the same text
+differently.) The \cc{default} branch makes the assignment complete.
+
+\begin{pitfall}
+In \cc{always_comb}, assign every output in every case, for example with a
+\cc{default} branch, or with a value assigned before the \cc{case}, as
+\cc{dev_hex} does with \cc{digit = 0;}. In \cc{always_ff}, a missing
+assignment is no problem: a flip-flop that keeps its value is a flip-flop with
+enable. That is why the \cc{case} blocks in \cc{always_ff} above need no
+\cc{default}.
+\end{pitfall}
+
+\begin{exercise}
+\label{ex:step06-enum}
+Remove the \cc{default} branch again, and give the \cc{enum} a base
+type of two bits: write \cc{typedef enum logic [1:0]} instead of
+\cc{typedef enum} in line 26. Does yosys still find a latch? Why?
+\end{exercise}
+
+\section{What yosys and nextpnr Make of It}
+
+\outputfile{step06_yosys_stat.txt}
+
+Most of the 40 \cc{SB_CARRY} belong to the two accumulators of the tick
+generators: 18 each, for adders of 19 bits. The flip-flops come in more kinds
+than before; the letters S and R stand for set and reset inputs, which yosys
+uses for assignments of constants, such as \cc{acc <= inc} when
+\cc{enable} is 0. nextpnr places it all on 133 logic cells:
+
+\outputfile{step06_pnr.txt}
+
+\section{Talking to the Board}
+\label{sec:step06-kermit}
+
+After \cc{make prog}, the board waits for characters. On the computer, the
+USB chip appears as a serial port, and any terminal program can use it. The
+repository contains a script for C-Kermit:
+
+\par\noindent\begin{minipage}{\linewidth}
+\lstinputlisting[style=term,title={\texttt{06\_io\_mirror/kermit-serial}}]{../06_io_mirror/kermit-serial}
+\end{minipage}\par
+
+\cc{set line} names the serial port. The USB chip has two channels, one for
+programming the flash and one for the serial line. On a Mac the serial line
+appears as \cc{/dev/tty.usbserial-} followed by an identifier of the chip; the
+name in the script is that of the author's board. Look with
+\cc{ls /dev/tty.usbserial-*} which name yours has, and change the line. (On Linux the port is usually
+\cc{/dev/ttyUSB1}.) \cc{set speed 9600} is our baud rate, \cc{set stop-bits
+2} matches the two stop bits of our transmitter. \cc{carrier-watch off} tells
+Kermit not to wait for modem signals, which our line does not have, and the
+two \cc{set terminal} lines make the Return key, which sends a carriage return
+(code \cc{0D}), also start a new line on the screen. \cc{connect} starts the
+terminal; \texttt{Ctrl-\textbackslash} followed by \cc{c} returns to the Kermit
+prompt, where \cc{exit} ends it.
+
+Copy the script to a directory in your \cc{PATH}, make it executable and run
+it. Each key you press is sent to the FPGA, comes back and appears on the
+screen, and the display shows its code: \cc{41} for \cc{A}, \cc{61} for
+\cc{a}. Kermit itself does not show what you type, so if nothing appears,
+the FPGA did not answer.
+
+The design has a buffer of only one byte. While it waits in
+\cc{IO_BUFFERING_DATA} for the transmitter, it ignores \cc{rx_ready}, and a
+byte that arrives in this time is lost. When you type, this does not happen;
+when a program sends many bytes in a row, it can. The next step puts FIFOs
+between the UART and the rest of the design.
+
+\section{Simulation}
+\label{sec:step06-sim}
+
+To see the UART at work, the testbench has to play the computer: it sends a
+frame on \cc{RX} and watches what comes back on \cc{TX}. The level of
+\cc{RX} in each clock cycle is a function of the cycle number:
+
+\cpppart{firstline=9,lastline=29}{06_io_mirror/tb_test.cpp}
+
+The main loop drives the clock itself, one cycle per iteration, prints every
+change of \cc{TX} with its cycle, and samples the echo in the middle of each
+data bit:
+
+\cpppart{firstline=46,lastline=74}{06_io_mirror/tb_test.cpp}
+
+The output of \cc{make sim}:
+
+\outputfile{step06_echo.txt}
+
+The middle of the stop bit of the frame on \cc{RX} is at cycle
+$1000 + 9.5 \cdot 1250 = 12\,875$. The receiver reports the byte somewhat
+later, since the synchroniser and the filter delay the line by a few
+oversampling ticks, and the echo starts at cycle 13\,757 with the start bit.
+Then, with $\mathtt{41}_{16}$ = $\mathtt{01000001}_2$ sent LSB first: $d_0 =
+1$ from 15\,009, $d_1$ to $d_5 = 0$ from 16\,260, $d_6 = 1$ from 22\,516, $d_7
+= 0$ from 23\,768, and from 25\,019 on the line stays 1 for the stop bits and
+idle. The bits last 1251 or 1252 cycles, as computed in
+Section~\ref{sec:step06-baud}; five bits from 16\,260 to 22\,516 are 6256
+cycles. The testbench decodes the echo and compares it with the byte it sent;
+if they differ, it prints \cc{FAILED} and \cc{make sim} ends with an error.
+
+\begin{exercise}
+\label{ex:step06-tb}
+Change \cc{rx_level} so that the testbench sends the 26 letters \cc{A} to
+\cc{Z} back to back, each frame directly after the stop bit of the one
+before, and print the bytes that come back. Which letters are missing, and
+why? (Hint: compare the length of a frame on \cc{RX} and on \cc{TX}.)
+\end{exercise}
+
+\section{What Is Next}
+
+We can now exchange bytes with the computer, one at a time. Step 07 turns this
+into an I/O interface for the rest of the design: FIFOs that buffer bytes in
+both directions, built from block RAM, and the first SystemVerilog
+\cc{interface}s to connect the parts.
+
+\solutions
+
+\solution
+In \cc{IO_INIT_TRANSMISSION}, send the next code instead of the received one:
+\begin{lstlisting}
+tx_data_in <= data_buf + 1;
+\end{lstlisting}
+The display still shows the received byte, since it shows \cc{data_buf}. (For
+\cc{z}, the answer is \texttt{\{}, code \cc{7B}.)
+
+\solution
+With $f = 12\,000\,000$, $b = 115\,200$, $o = 1$: $f / b = 104$ (integer
+division), which has 7 binary digits, so \cc{acc_width} $= 15$. Then
+\cc{shiftlimiter} $=$ \cc{log2_(115200 >> 16)} $=$ \cc{log2_(1)} $= 1$, and
+\[
+  \mathit{inc} = \left\lfloor \frac{115\,200 \cdot 2^{14} + 3\,000\,000}{6\,000\,000}
+  \right\rfloor = \lfloor 315.07 \rfloor = 315 .
+\]
+The simulation with \cc{$display} agrees (\cc{acc_width 15, shiftlimit 1, inc
+315}). The tick rate is $12\,000\,000 \cdot 315 / 2^{15} \approx 115\,356$ per
+second, $0.14\,\%$ too fast. Without rounding, $115\,200 \cdot 2^{15} / 12\,000\,000
+= 314.57$; the error comes from rounding to an integer, and a larger $w$ would
+make it smaller.
+
+\solution
+With \cc{logic [1:0]} as base type, \cc{state} has 2 bits, and the four
+branches cover all four values. The \cc{case} is complete, \cc{next_state} is
+assigned for every input, and there is no latch. yosys synthesises the design
+without error, and the statistics are the same as with the \cc{default}
+branch.
+
+\solution
+In \cc{rx_level}, the frame number is $f = \lfloor (c - \mathtt{T0}) /
+(10 \cdot \mathtt{BIT}) \rfloor$ and the bit within the frame is $k =
+\lfloor (c - \mathtt{T0}) / \mathtt{BIT} \rfloor \bmod 10$; for $f < 26$
+the function returns the start bit, a data bit of letter number $f$, or the
+stop bit, as before, and 1 after the last frame. The
+echo then misses \cc{L} and \cc{W}: 24 letters come back. A frame on \cc{RX}
+takes 10 bit times, 12\,500 cycles, but our transmitter sends two stop bits,
+11 bit times or about 13\,768 cycles. So every character, the echo falls
+behind by about 1268 cycles. The state machine accepts a byte only in
+\cc{IO_READY_TO_RECEIVE}; with a byte waiting in \cc{IO_BUFFERING_DATA} for
+the transmitter, it ignores \cc{rx_ready}. After ten characters the backlog
+is a whole frame: the eleventh letter, \cc{L}, arrives while \cc{K} is still
+waiting, and is lost. Then the backlog starts again from a smaller value, and
+eleven letters later \cc{W} is lost. The FIFOs of step 07 make the buffer
+much longer, but the rate problem remains: in the long run a sender that is
+faster than the transmitter fills any buffer.

@@ -1,0 +1,9 @@
+== quad_lshift, case version ==
+      209 cells
+      209   SB_LUT4
+== quad_lshift, for version ==
+      276 cells
+      276   SB_LUT4
+== quad_lshift, shift version ==
+      182 cells
+      182   SB_LUT4

@@ -1,0 +1,12 @@
+$ make sim
+...
+
+### SIMULATING ###
+loader done after 48 cycles
+BTN1: address 00, byte 01 (expected 00, 01)
+BTN2: address 01, byte 23 (expected 01, 23)
+BTN2: address 02, byte 45 (expected 02, 45)
+BTN2: address 03, byte 67 (expected 03, 67)
+BTN2: address 04, byte 89 (expected 04, 89)
+BTN2: address 05, byte ab (expected 05, ab)
+PASSED

@@ -5,18 +5,20 @@ module test (
 );
 
     initial begin
-	Q1 = 0;
-	Q2 = 0;
+        Q1 = 0;
+        Q2 = 0;
     end
 
+    logic nextQ1, nextQ2;
+
     always_comb begin
-	nextQ1 = ~Q1 | Q2;
-	nextQ2 = ~(Q1 & Q2);
+        nextQ1 = ~Q1 | Q2;
+        nextQ2 = ~(Q1 & Q2);
     end
     
     always_ff @ (posedge clock) begin
-	Q1 <= nextQ1;
-	Q2 <= nextQ2;
+        Q1 <= nextQ1;
+        Q2 <= nextQ2;
     end
 
 endmodule

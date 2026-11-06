@@ -8,16 +8,16 @@ interface if_instr_io;
 
     // decoder is client
     modport client (
-	output op,
-	output char_imm,
-	output char_reg
+        output op,
+        output char_imm,
+        output char_reg
     );
 
     // control unit is server
     modport server (
-	input op,
-	input char_imm,
-	input char_reg
+        input op,
+        input char_imm,
+        input char_reg
     );
 
 endinterface

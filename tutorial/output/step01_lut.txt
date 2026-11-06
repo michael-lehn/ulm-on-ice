@@ -1,0 +1,8 @@
+{
+  "LED2_SB_LUT4_O": {
+    "type": "SB_LUT4",
+    "parameters": {
+      "LUT_INIT": "1111111111110000"
+    }
+  }
+}

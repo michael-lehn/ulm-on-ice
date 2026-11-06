@@ -1,0 +1,8 @@
+$ grep "^===" test_report_stat.txt
+=== $paramod$2b706d08ef05df23db92f52fab0b950e0ab44c8f\baud_tick_gen ===
+=== $paramod$b8fadbcf2318bd0d6773d4349c254f0af7dca0b4\baud_tick_gen ===
+=== $paramod$b8fadbcf2318bd0d6773d4349c254f0af7dca0b4\uart_rx ===
+=== $paramod$b8fadbcf2318bd0d6773d4349c254f0af7dca0b4\uart_tx ===
+=== dev_hex ===
+=== test ===
+=== design hierarchy ===

@@ -1,0 +1,13 @@
+2.60. Printing statistics.
+
+=== test ===
+
+        +----------Local Count, excluding submodules.
+        | 
+       ...
+       42 submodules
+        3   SB_CARRY
+        6   SB_DFF
+        8   SB_DFFE
+        7   SB_DFFESS
+       18   SB_LUT4

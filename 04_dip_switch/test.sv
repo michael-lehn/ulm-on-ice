@@ -28,16 +28,16 @@ module test (
     logic [7:0] hex_val = 8'h0;
 
     always_ff @ (posedge CLK) begin
-	if (BTN1) begin
-	    hex_val <= hex_in;
-	end
+        if (BTN1) begin
+            hex_val <= hex_in;
+        end
     end
 
     dev_hex dev_hex0 (
-	.clk(CLK),
-	.en(1'b1),
-	.hex_val(hex_val),
-	.hex_pins(hex_out)
+        .clk(CLK),
+        .en(1'b1),
+        .hex_val(hex_val),
+        .hex_pins(hex_out)
     );
 
 endmodule

@@ -1,0 +1,13 @@
+Info: Critical path report for cross-domain path '<async>' -> '<async>':
+Info:       type curr  total name
+Info:     source  0.00  0.00 Source BTN2$sb_io.D_IN_0
+Info:    routing  5.54  5.54 Net BTN2$SB_IO_IN (21,0) -> (18,18)
+Info:                          Sink LED2_SB_LUT4_O_LC.I2
+Info:                          Defined in:
+Info:                               test.v:18.7-18.8
+Info:      logic  1.21  6.75 Source LED2_SB_LUT4_O_LC.O
+Info:    routing  4.22  10.97 Net LED2$SB_IO_OUT (18,18) -> (18,31)
+Info:                          Sink LED2$sb_io.D_OUT_0
+Info:                          Defined in:
+Info:                               test.v:15.14-15.18
+Info: 1.21 ns logic, 9.77 ns routing

@@ -1,0 +1,21 @@
+2.60. Printing statistics.
+
+=== test ===
+
+        +----------Local Count, excluding submodules.
+        | 
+      158 wires
+      371 wire bits
+      158 public wires
+      371 public wire bits
+       24 ports
+       24 port bits
+        1 cells
+        1   $scopeinfo
+      220 submodules
+       26   SB_CARRY
+        9   SB_DFF
+       28   SB_DFFE
+        7   SB_DFFESS
+       18   SB_DFFSR
+      132   SB_LUT4

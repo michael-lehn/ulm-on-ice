@@ -14,32 +14,32 @@ interface if_alu;
     /* verilator lint_on UNUSEDSIGNAL */
 
     modport server(
-	input op,
-	input a,
-	input b,
-	output s,
-	output zf,
-	output cf,
-	output of,
-	output sf
+        input op,
+        input a,
+        input b,
+        output s,
+        output zf,
+        output cf,
+        output of,
+        output sf
     );
     
     modport client(
-	output op,
-	output a,
-	output b,
-	input s,
-	input zf,
-	input cf,
-	input of,
-	input sf
+        output op,
+        output a,
+        output b,
+        input s,
+        input zf,
+        input cf,
+        input of,
+        input sf
     );
 
     modport observer(
-	input zf,
-	input cf,
-	input of,
-	input sf
+        input zf,
+        input cf,
+        input of,
+        input sf
     );
      
 endinterface

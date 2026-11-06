@@ -1,0 +1,8 @@
+$ make sim
+...
+
+### SIMULATING ###
+front of input buffer: 5a
+after BTN1:            31
+TX: 5a 31 32 41
+PASSED

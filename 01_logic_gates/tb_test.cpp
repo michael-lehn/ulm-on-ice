@@ -21,27 +21,27 @@ main(int argc, char **argv, char **env)
     std::uint64_t sim_time = 0;
 
     while (sim_time < MAX_SIM_TIME) {
-	switch (sim_time) {
-	    case 5:
-		dut->BTN1 = 1;
-		dut->BTN2 = 0;
-		break;
-	    case 8:
-		dut->BTN1 = 1;
-		dut->BTN2 = 1;
-		break;
-	    case 11:
-		dut->BTN1 = 0;
-		dut->BTN2 = 1;
-		break;
-	    default:
-		dut->BTN1 = 0;
-		dut->BTN2 = 0;
-	}
-	dut->eval();
+        switch (sim_time) {
+            case 5:
+                dut->BTN1 = 1;
+                dut->BTN2 = 0;
+                break;
+            case 8:
+                dut->BTN1 = 1;
+                dut->BTN2 = 1;
+                break;
+            case 11:
+                dut->BTN1 = 0;
+                dut->BTN2 = 1;
+                break;
+            default:
+                dut->BTN1 = 0;
+                dut->BTN2 = 0;
+        }
+        dut->eval();
 
-	m_trace->dump(sim_time);
-	sim_time++;
+        m_trace->dump(sim_time);
+        sim_time++;
     }
 
     m_trace->close();

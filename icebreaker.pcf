@@ -28,7 +28,7 @@ set_io -nowarn FLASH_IO2  12
 set_io -nowarn FLASH_IO3  13
 
 # for hex display
-set_io -nowarn A0	   4
+set_io -nowarn A0          4
 set_io -nowarn A1          2
 set_io -nowarn A2         47
 set_io -nowarn A3         45
@@ -46,6 +46,34 @@ set_io -nowarn P1A7        3
 set_io -nowarn P1A8       48
 set_io -nowarn P1A9       46
 set_io -nowarn P1A10      44
+
+# for DIP switch
+set_io -nowarn B0         43
+set_io -nowarn B1         38
+set_io -nowarn B2         34
+set_io -nowarn B3         31
+set_io -nowarn B4         42
+set_io -nowarn B5         36
+set_io -nowarn B6         32
+set_io -nowarn B7         28
+
+# PMOD 1A and 1B as 8-bit buses (used by 07_io_interface)
+set_io -nowarn PMOD_1A[0]   4
+set_io -nowarn PMOD_1A[1]   2
+set_io -nowarn PMOD_1A[2]  47
+set_io -nowarn PMOD_1A[3]  45
+set_io -nowarn PMOD_1A[4]   3
+set_io -nowarn PMOD_1A[5]  48
+set_io -nowarn PMOD_1A[6]  46
+set_io -nowarn PMOD_1A[7]  44
+set_io -nowarn PMOD_1B[0]  43
+set_io -nowarn PMOD_1B[1]  38
+set_io -nowarn PMOD_1B[2]  34
+set_io -nowarn PMOD_1B[3]  31
+set_io -nowarn PMOD_1B[4]  42
+set_io -nowarn PMOD_1B[5]  36
+set_io -nowarn PMOD_1B[6]  32
+set_io -nowarn PMOD_1B[7]  28
 
 # PMOD 1B
 set_io -nowarn P1B1       43

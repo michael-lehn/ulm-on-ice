@@ -1,0 +1,2 @@
+acc_width          19, shiftlimit           2, inc         419
+acc_width          19, shiftlimit           5, inc        3355

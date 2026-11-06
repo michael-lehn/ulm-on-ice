@@ -1,0 +1,18 @@
+2.60. Printing statistics.
+
+=== test ===
+
+        +----------Local Count, excluding submodules.
+        | 
+       11 cells
+        9   $scopeinfo
+        2   SB_RAM40_4K
+      538 submodules
+      102   SB_CARRY
+       44   SB_DFF
+       89   SB_DFFE
+       12   SB_DFFESR
+        7   SB_DFFESS
+       53   SB_DFFSR
+        5   SB_DFFSS
+      226   SB_LUT4

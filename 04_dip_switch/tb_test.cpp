@@ -25,42 +25,44 @@ main(int argc, char **argv, char **env)
     std::size_t numCh = 0;
 
     while (sim_time < MAX_SIM_TIME) {
-	dut->CLK ^= 1;
+        dut->CLK ^= 1;
 
-	if (dut->CLK == 1) {
-	    posedge_cnt++;
+        if (dut->CLK == 1) {
+            posedge_cnt++;
+        } else {
+            // Change the inputs at the falling edge, half a clock cycle
+            // before the rising edge that samples them.
+            dut->B0 = 0;
+            dut->B1 = 0;
+            dut->B2 = 0;
+            dut->B3 = 0;
+            dut->B4 = 0;
+            dut->B5 = 0;
+            dut->B6 = 0;
+            dut->B7 = 0;
+            switch (posedge_cnt + 1) {
+                case 5:
+                    dut->B0 = 1;
+                    dut->B1 = 1;
+                    dut->BTN1 = 1;
+                    break;
+                case 8:
+                    dut->B1 = 1;
+                    dut->BTN1 = 1;
+                    break;
+                case 11:
+                    dut->B0 = 1;
+                    dut->B7 = 1;
+                    dut->BTN1 = 0;
+                    break;
+                default:
+                    dut->BTN1 = 0;
+            }
+        }
+        dut->eval();
 
-	    dut->B0 = 0;
-	    dut->B1 = 0;
-	    dut->B2 = 0;
-	    dut->B3 = 0;
-	    dut->B4 = 0;
-	    dut->B5 = 0;
-	    dut->B6 = 0;
-	    dut->B7 = 0;
-	    switch (posedge_cnt) {
-		case 5:
-		    dut->B0 = 1;
-		    dut->B1 = 1;
-		    dut->BTN1 = 1;
-		    break;
-		case 8:
-		    dut->B1 = 1;
-		    dut->BTN1 = 1;
-		    break;
-		case 11:
-		    dut->B0 = 1;
-		    dut->B7 = 1;
-		    dut->BTN1 = 0;
-		    break;
-		default:
-		    dut->BTN1 = 0;
-	    }
-	}
-	dut->eval();
-
-	m_trace->dump(sim_time);
-	sim_time++;
+        m_trace->dump(sim_time);
+        sim_time++;
     }
 
     m_trace->close();

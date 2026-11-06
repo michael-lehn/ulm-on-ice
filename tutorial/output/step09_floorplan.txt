@@ -1,0 +1,10 @@
+Instance           Logic cells  Share  Blocks         Largest parts
+dev_alu0                  1546  50.9%  1 DSP
+ram0                       454  15.0%  4 SPRAMs       spram10 126, spram11 104, spram01 55, spram00 19
+dev_reg_file0              339  11.2%  8 block RAMs   mem 339
+dev_cu0                    331  10.9%                 instr_alu 156, instr_bus 34, instr_io 16, instr_cu 15
+io0                        196   6.5%  2 block RAMs   uart_tx0 35, uart_rx0 32, outbuf 29, ...
+ram_loader                  44   1.4%
+dev_loader0                 44   1.4%
+Other                       19   0.6%                 io_loader 7, dev_hex0 6, io 6
+(top-level logic)           63   2.1%  16 I/O pins    route-through 13

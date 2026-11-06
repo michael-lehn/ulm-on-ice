@@ -11,23 +11,23 @@ interface if_reg_file;
     logic [pkg_reg::REG_WIDTH-1:0] data_out1;
 
     modport server(
-	input op,
-	input addr_in,
-	input addr_out0,
-	input addr_out1,
-	input data_in,
-	output data_out0,
-	output data_out1
+        input op,
+        input addr_in,
+        input addr_out0,
+        input addr_out1,
+        input data_in,
+        output data_out0,
+        output data_out1
     );
 
     modport client(
-	output op,
-	output addr_in,
-	output addr_out0,
-	output addr_out1,
-	output data_in,
-	input data_out0,
-	input data_out1
+        output op,
+        output addr_in,
+        output addr_out0,
+        output addr_out1,
+        output data_in,
+        input data_out0,
+        input data_out1
     );
 
 endinterface

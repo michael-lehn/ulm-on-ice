@@ -1,0 +1,1 @@
+Info: Max frequency for clock 'clock$SB_IO_IN_$glb_clk': 232.23 MHz (PASS at 12.00 MHz)

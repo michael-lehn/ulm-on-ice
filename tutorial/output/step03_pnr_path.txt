@@ -1,0 +1,25 @@
+Info: Critical path report for clock 'CLK$SB_IO_IN_$glb_clk' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  1.39  1.39 Source posEdgeCount_SB_DFFSR_Q_9_D_SB_LUT4_O_LC.O
+Info:    routing  1.76  3.15 Net posEdgeCount[0] (5,1) -> (4,1)
+Info:                          Sink $nextpnr_ICESTORM_LC_0.I1
+Info:      logic  0.68  3.83 Source $nextpnr_ICESTORM_LC_0.COUT
+Info:    routing  0.00  3.83 Net $nextpnr_ICESTORM_LC_0$O (4,1) -> (4,1)
+Info:                          Sink posEdgeCount_SB_DFFSR_Q_8_D_SB_LUT4_O_LC.CIN
+Info:      logic  0.28  4.10 Source posEdgeCount_SB_DFFSR_Q_8_D_SB_LUT4_O_LC.COUT
+Info:    routing  0.00  4.10 Net posEdgeCount_SB_DFFSR_Q_7_D_SB_LUT4_O_I3 (4,1) -> (4,1)
+Info:                          Sink posEdgeCount_SB_DFFSR_Q_7_D_SB_LUT4_O_LC.CIN
+Info:      logic  0.28  4.38 Source posEdgeCount_SB_DFFSR_Q_7_D_SB_LUT4_O_LC.COUT
+Info:    routing  0.00  4.38 Net posEdgeCount_SB_DFFSR_Q_6_D_SB_LUT4_O_I3 (4,1) -> (4,1)
+Info:                          Sink posEdgeCount_SB_DFFSR_Q_6_D_SB_LUT4_O_LC.CIN
+...
+Info:      logic  0.28  13.56 Source posEdgeCount_SB_DFFSR_Q_25_D_SB_LUT4_O_LC.COUT
+Info:    routing  0.00  13.56 Net posEdgeCount_SB_DFFSR_Q_26_D_SB_LUT4_O_I3 (4,4) -> (4,4)
+Info:                          Sink posEdgeCount_SB_DFFSR_Q_26_D_SB_LUT4_O_LC.CIN
+Info:      logic  0.28  13.83 Source posEdgeCount_SB_DFFSR_Q_26_D_SB_LUT4_O_LC.COUT
+Info:    routing  0.66  14.50 Net posEdgeCount_SB_DFFSR_Q_10_D_SB_LUT4_O_I3 (4,4) -> (4,4)
+Info:                          Sink posEdgeCount_SB_DFFSR_Q_10_D_SB_LUT4_O_LC.I3
+Info:      setup  0.82  15.32 Source posEdgeCount_SB_DFFSR_Q_10_D_SB_LUT4_O_LC.I3
+Info: 11.23 ns logic, 4.09 ns routing
+
+Info: Max frequency for clock 'CLK$SB_IO_IN_$glb_clk': 65.27 MHz (PASS at 12.00 MHz)

@@ -1,0 +1,5 @@
+Info: Device utilisation:
+Info:            ICESTORM_LC:     133/   5280     2%
+Info:                  SB_IO:      11/     39    28%
+Info:                  SB_GB:       1/      8    12%
+Info: Max frequency for clock 'CLK$SB_IO_IN_$glb_clk': 66.13 MHz (PASS at 12.00 MHz)

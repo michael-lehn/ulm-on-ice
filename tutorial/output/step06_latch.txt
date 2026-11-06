@@ -1,0 +1,5 @@
+$ make test.json
+sv2v -v --define=SYNTHESIS --write=test.v baud_tick_gen.sv dev_hex.sv test.sv uart_rx.sv uart_tx.sv
+yosys -ql test.log -p 'synth_ice40 -abc9 -dffe_min_ce_use 4 -device u -dsp -top test -json test.json' test.v
+ERROR: Latch inferred for signal `\test.\next_state [1:0]' from process `\test.$proc$test.v:241$380': $auto$proc_dlatch.cc:559:proc_dlatch$652
+make: *** [Makefile:40: test.json] Error 1

@@ -1,5 +1,5 @@
 interface if_fifo #(
-    localparam WIDTH = 8		// each entry is one byte
+    localparam WIDTH = 8                // each entry is one byte
 );
     logic empty;
     logic full;
@@ -9,12 +9,12 @@ interface if_fifo #(
     logic [WIDTH-1:0] data_in;
 
     modport fifo(
-	input pop_front,
-	input push_back,
-	input data_in,
-	output empty,
-	output full,
-	output data_out
+        input pop_front,
+        input push_back,
+        input data_in,
+        output empty,
+        output full,
+        output data_out
     );
 endinterface
 

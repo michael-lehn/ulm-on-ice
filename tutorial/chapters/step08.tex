@@ -1,0 +1,581 @@
+\chapter{Step 08: A Program Loader}
+\label{ch:step08}
+
+A computer needs memory, and the 512 bytes of a block RAM are not much. The
+iCE40UP5K has four larger memory blocks, together 128\,KiB, and in this step we
+put them to use: as the 64-bit memory of the ULM, which can be read and written
+in bytes, words (2 bytes), longs (4 bytes) and quads (8 bytes). To get
+something into the memory, we build a \term{loader}: it reads hexadecimal
+digits from the I/O device of step 07, combines two of them into a byte, and
+stores the bytes one after the other, until the character \cc{0x04} ends the
+input. A small debugger lets us look at the result with the buttons. New are
+the SPRAM blocks of the FPGA and how we instantiate them, a simulation model
+that the synthesis must not see, the shift and mask logic for accesses of
+different sizes, and \cc{for} loops. Everything is in \cc{08_dev_loader}; the
+I/O device and the FIFOs come from step 07 (Chapter~\ref{ch:step07}).
+
+\section{What the Design Does}
+\label{sec:step08-design}
+
+In a terminal connected to the board you type a program as hexadecimal
+digits, for example \cc{32 10}, and then Ctrl-D, which sends the character
+\cc{0x04}. The loader stores \cc{0x32} at address 0 and \cc{0x10} at address 1.
+Characters that are not hexadecimal digits, like the space, are skipped. While
+you type, the display shows the byte being assembled, and \cc{LED4} is on
+while half of a byte (one digit) has been typed. After \cc{0x04}, \cc{LED3}
+goes on and the memory belongs to the debugger: \cc{BTN1} reads the byte at
+address 0, each press of \cc{BTN2} the byte at the next address, and the
+display shows the low byte of the address, or the byte read while \cc{BTN3}
+is held.
+Pressing \cc{BTN1} and \cc{BTN3} together resets the loader.
+
+Figure~\ref{fig:step08-blocks} shows how the parts are connected. Three
+interfaces of type \cc{if_ram} connect the loader and the debugger to a switch,
+and the switch to the memory \cc{dev_ram}. The switch is controlled by the
+loader's output \cc{done}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=5mm and 8mm]
+  \node[box,minimum width=16mm,minimum height=9mm] (io) {\cc{dev_io}};
+  \node[box,right=of io,minimum width=30mm,minimum height=9mm] (ld) {\cc{dev_loader}};
+  \node[box,below=10mm of ld,minimum width=30mm,minimum height=9mm] (db) {\cc{dev_ram_debugger}};
+  \node[box,right=24mm of ld,minimum width=18mm,minimum height=22mm,yshift=-9.5mm] (sw) {\cc{dev_ram_switch}};
+  \node[box,fill=green!10,right=of sw,minimum width=18mm,minimum height=22mm] (ram) {\cc{dev_ram}\\[-2pt]\footnotesize 4 SPRAMs\\[-2pt]\footnotesize 128\,KiB};
+  \node[left=8mm of io,note] (rx) {\cc{RX}, \cc{TX}};
+  \draw[biarrow] (rx) -- (io);
+  \draw[biarrow] (io) -- node[above,note] {\cc{if_io}} (ld);
+  \draw[biarrow] (ld.east) -- node[above,note] {\cc{ram_loader}} (ld.east -| sw.west);
+  \draw[biarrow] (db.east) -- node[above,note] {\cc{ram_debugger}} (db.east -| sw.west);
+  \draw[biarrow] (sw) -- node[above,note] {\cc{ram}} (ram);
+  \draw[arrow] (ld.north) -- ++(0,5mm) -| node[pos=0.25,above,note] {\cc{done} = select} (sw.north);
+  \node[left=8mm of db,note] (btn) {\cc{BTN1}--\cc{BTN3}};
+  \draw[arrow] (btn) -- (db);
+\end{tikzpicture}
+\caption{The parts of step 08. Until the loader is done, the switch connects
+it to the memory; afterwards, the debugger.}
+\label{fig:step08-blocks}
+\end{figure}
+
+\section{The Single-Port RAMs of the iCE40UP5K}
+\label{sec:step08-spram}
+
+Besides the 30 block RAMs of Section~\ref{sec:step07-bram}, the iCE40UP5K has
+four \term{single-port RAMs}, SPRAM for short. Each has $256$\,kbit, organised
+as $16384$ words of 16 bits, so together they hold $4 \cdot 256\,\text{kbit} =
+1\,\text{Mbit} = 128$\,KiB, more than eight times as much as all block RAMs
+($30 \cdot 4\,\text{kbit} = 15$\,KiB). The price is in the name: a single port
+means one address per clock cycle, used either for reading or for writing.
+
+Instead of describing a memory and hoping that yosys recognises it, as in
+step 07, we instantiate the hard block directly, like a module. Its name in the netlist is
+\cc{SB_SPRAM256KA}, and \cc{spram.sv} wraps it:
+
+\svfile{08_dev_loader/spram.sv}
+
+There is no module \cc{SB_SPRAM256KA} in our design that describes how it
+works. yosys knows it as one of the building blocks of the iCE40, like
+\cc{SB_LUT4}, and puts it into the netlist as it is; nextpnr places it on one of
+the four SPRAM sites. Its ports:
+\begin{description}
+\item[\cc{ADDRESS}, \cc{DATAIN}, \cc{DATAOUT}:] 14 address bits ($2^{14} =
+  16384$ words) and 16 data bits in each direction.
+\item[\cc{WREN}, \cc{MASKWREN}:] \cc{WREN} = 1 writes, \cc{WREN} = 0 reads.
+  \cc{MASKWREN} has one bit per 4-bit group (\term{nibble}) of the word, and
+  only the nibbles whose bit is 1 are written. So we can write a single byte of
+  a word by setting two of the four bits. \cc{spram.sv} uses one signal
+  \cc{we} for both: write if any mask bit is set.
+\item[\cc{CLOCK}:] both reading and writing happen at the rising edge. A read
+  delivers the word at \cc{DATAOUT} after the edge, like the block RAM of step
+  07.
+\item[\cc{CHIPSELECT}, \cc{STANDBY}, \cc{SLEEP}, \cc{POWEROFF}:] for power
+  saving. We keep the block always selected and awake. Note that
+  \cc{POWEROFF} is active low: 1 means ``power on''.
+\end{description}
+
+\subsection*{A model for the simulation, hidden from the synthesis}
+
+Verilator does not know \cc{SB_SPRAM256KA}: it is not a SystemVerilog module
+but a piece of silicon. For the simulation we need a description of what it
+does, a \term{simulation model}. The file \cc{SB_SPRAM256KA.sv} contains one,
+taken from yosys's own models of the iCE40 cells:
+
+\svpart{firstline=11,lastline=53}{08_dev_loader/SB_SPRAM256KA.sv}
+
+The model is a memory \cc{mem} of 16384 words, here declared with an explicit
+range \cc{[0:16383]} instead of the size \cc{[DEPTH]} of step 07; both mean
+the same. At the rising clock edge it either reads into \cc{DATAOUT} or writes
+the selected nibbles, and while writing \cc{DATAOUT} becomes undefined
+(\cc{16'bx}). This is how we learn the behaviour of the hard block without the
+board.
+
+The body of the model is enclosed in \cc{`ifndef SYNTHESIS} \dots\
+\cc{`endif}. As with the include guard of Section~\ref{sec:step07-package},
+the preprocessor drops the text if the macro \cc{SYNTHESIS} is defined. The
+Makefile calls sv2v with \cc{--define=SYNTHESIS} (Section~\ref{sec:step01-synth}),
+Verilator without. So Verilator simulates the model, while the file that
+yosys reads contains only the ports:
+
+\outputfile{step08_sv2v_spram.txt}
+
+An empty module like this is a \term{black box}: it says which connections the
+block has, but nothing about its inside, which is exactly right for a hard
+block. Without the guard, a tool that does not know \cc{SB_SPRAM256KA} would
+have to build a memory of 256\,kbit from logic cells, and the whole chip does
+not have that many flip-flops. (yosys's \cc{synth_ice40} happens to be safe
+anyway: it loads its own definition of the cell, and we checked that it
+produces the same statistics without \cc{--define=SYNTHESIS}. The guard does not
+rely on that.)
+
+\section{for Loops Are Replicated Hardware}
+\label{sec:step08-for}
+
+The model contains our first \cc{for} loop:
+\begin{lstlisting}
+always @(negedge POWEROFF) begin
+    for (i = 0; i <= 16383; i = i+1)
+        mem[i] = 16'bx;
+end
+\end{lstlisting}
+In the simulation this is what it looks like: a loop that the simulator runs,
+setting all words to ``undefined'' when the power goes off. It is part of the
+model, which the synthesis never sees.
+
+In a description of hardware, a \cc{for} loop means something else. There is no
+time in which a loop could run; the tools \term{unroll} it, that is, they write
+the body down once for each value of the loop variable, and each copy becomes
+its own piece of circuit. The number of iterations must be a constant. An
+example: the module \cc{quad_lshift} below (Section~\ref{sec:step08-ram})
+selects one of eight shifts with a \cc{case}. The same can be written with a
+loop:
+\begin{lstlisting}
+always_comb begin
+    data_out = data_in;
+    for (int k = 1; k < 8; k++)
+        if (offset == k)
+            data_out = data_in << 8*k;
+end
+\end{lstlisting}
+Unrolled, this is seven \cc{if} statements one after the other, and each
+\cc{if} is a comparator and a 64-bit multiplexer that either passes on the
+value from the copy before or replaces it: a chain of seven multiplexers. In
+\cc{always_comb}, a later assignment to the same signal wins, so the chain is
+ordered, with the last copy closest to the output. We synthesised the
+repository's version, this loop, and a third version with a single shift,
+\cc{data_out = data_in << {offset, 3'b000};} (the comment in
+\cc{quad_lshift.sv}):
+
+\outputfile{step08_lshift_variants.txt}
+
+All three compute the same function. The loop is a chain of seven 2-to-1
+multiplexers and costs the most; the \cc{case} is one 8-to-1 multiplexer per
+bit; the single shift by $8 \cdot \mathtt{offset}$ lets yosys build a
+\term{barrel shifter}: three stages that shift by 8, 16 and 32 bits or not,
+one stage per bit of \cc{offset}. yosys simplifies a lot, but not everything;
+how we describe a function still shows in the result.
+
+\section{A 64-bit Memory from Four 16-bit Ones}
+\label{sec:step08-ram}
+
+The ULM has 64-bit registers and reads and writes bytes, words, longs and
+quads. We place the four SPRAMs side by side, so that each address of the
+SPRAMs holds a quad of 64 bits (Figure~\ref{fig:step08-layout}). The memory is
+addressed in bytes: a byte address $a$ has 17 bits, since $2^{17} = 128$\,Ki,
+and we split it as
+\[
+  a = 8t + o, \qquad t = \lfloor a/8 \rfloor \in \{0,\dots,16383\}, \quad
+  o = a \bmod 8 \in \{0,\dots,7\},
+\]
+where the \term{tag} $t$ (the upper 14 bits of $a$) is the address of the quad
+in all four SPRAMs and the \term{offset} $o$ (the lower 3 bits) selects the
+byte within the quad. The byte with offset 0 is the most significant byte of
+the quad: the bytes are stored in big-endian order, as on the ULM.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1.6mm,y=1mm]
+  \foreach \s/\n in {0/spram00,1/spram01,2/spram10,3/spram11} {
+    \draw[fill=green!8] (16*\s,0) rectangle (16*\s+16,8);
+    \node[font=\scriptsize\ttfamily] at (16*\s+8,15) {\n};
+    \pgfmathtruncatemacro{\hi}{63-16*\s}
+    \pgfmathtruncatemacro{\lo}{48-16*\s}
+    \node[font=\scriptsize,anchor=south west] at (16*\s,8) {\hi};
+    \node[font=\scriptsize,anchor=south east] at (16*\s+16,8) {\lo};
+  }
+  \foreach \b/\v in {0/01,1/23,2/45,3/67,4/89,5/AB,6/CD,7/EF} {
+    \draw (8*\b,0) -- (8*\b,8);
+    \node[font=\small\ttfamily] at (8*\b+4,4) {\v};
+    \node[font=\scriptsize] at (8*\b+4,-3) {$o=\b$};
+  }
+  \node[note,anchor=east] at (-2,4) {quad at tag $t$:};
+  \node[note,anchor=north] at (32,-7) {byte addresses $8t+0, \dots, 8t+7$};
+\end{tikzpicture}
+\caption{One quad of the memory, here with the value \cc{0x0123456789ABCDEF}.
+Each SPRAM holds 16 of its 64 bits, all four at the same address $t$. The byte
+at address $8t+o$ is bits $63-8o$ down to $56-8o$.}
+\label{fig:step08-layout}
+\end{figure}
+
+\subsection*{The types of an access}
+
+The package \cc{pkg_ram} from Section~\ref{sec:step07-package} defines the
+kinds of access:
+\svpart{firstline=12,lastline=31}{08_dev_loader/pkg_ram.sv}
+and the interface to the memory uses them as types:
+
+\svfile{08_dev_loader/if_ram.sv}
+
+A user sets \cc{op} to \cc{RAM_FETCH} or \cc{RAM_STORE} for one clock cycle,
+together with \cc{data_type}, the byte address \cc{addr} and, for a store,
+\cc{data_in}. A value of 8, 16 or 32 bits is always passed in the low bits of
+the 64-bit \cc{data_in} and \cc{data_out}.
+
+\subsection*{Reading: shift left, then extend}
+
+\svpart{firstline=16,lastline=51}{08_dev_loader/dev_ram.sv}
+
+The SPRAM delivers its data one clock cycle after the address. By then the
+user has usually taken \cc{op} back to \cc{RAM_NOP} and may have changed
+\cc{addr}. So \cc{dev_ram} stores the address and data type of every access in
+the registers \cc{addr_r} and \cc{data_type_r}, and the \cc{always_comb} block
+selects: during an access the new values, otherwise the stored ones. Thus the
+offset that the shifters see belongs to the data that the SPRAMs deliver. (In
+cycles without an access, \cc{we} is 0, and the SPRAMs keep reading the quad at
+the stored address.)
+
+The rest of \cc{dev_ram} instantiates the four SPRAMs with the tag as
+address, and between them and the interface the units that move the bytes.
+The read side:
+
+\svpart{firstline=53,lastline=72}{08_dev_loader/dev_ram.sv}
+
+To read the value at offset $o$, \cc{quad_lshift} shifts the quad left by $8o$
+bits, so that the wanted bytes become the most significant ones:
+
+\svfile{08_dev_loader/quad_lshift.sv}
+
+(\cc{<<} shifts left and fills with zeros; the bits that move out at the top are
+lost. The imports of \cc{RAM_LONG} and so on are not used here.) Then
+\cc{quad_ext_high} takes the top 8, 16, 32 or 64 bits and puts them into the
+low bits of the result, filling the rest with zeros:
+
+\svpart{firstline=21,lastline=41}{08_dev_loader/quad_ext_high.sv}
+
+\cc{{RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}}} is a replication (Chapter~\ref{ch:step05}): 56 copies of
+the bit 0, concatenated. So, for a byte, \cc{data_out} is 56 zeros followed by
+bits 63 to 56 of the shifted quad. The \cc{default} case, here for
+\cc{RAM_QUAD}, passes everything.
+
+With the quad of Figure~\ref{fig:step08-layout}, a byte fetch at offset 3:
+\[
+\begin{array}{lll}
+\text{from the SPRAMs} & \mathtt{0x0123456789ABCDEF} & \\
+\text{shifted left by } 8 \cdot 3 = 24 & \mathtt{0x6789ABCDEF000000} &
+  \text{(\cc{quad_lshift})} \\
+\text{top 8 bits, zero-extended} & \mathtt{0x0000000000000067} &
+  \text{(\cc{quad_ext_high})}
+\end{array}
+\]
+and a long fetch at offset 4 gives \cc{0x89ABCDEF00000000} after the shift and
+\cc{0x0000000089ABCDEF} at the end.
+
+\subsection*{Writing: extend, shift right, mask}
+
+A store runs the other way. \cc{quad_ext_low} moves the low 8, 16 or 32 bits of
+\cc{data_in} to the top of a quad, with zeros below (it is the mirror image of
+\cc{quad_ext_high}), and \cc{quad_rshift} shifts right by $8o$, which moves
+them to their place. Then all four SPRAMs get 16 bits each, but only the
+nibbles that belong to the value may be written. This is the job of
+\cc{quad_we_mask}:
+
+\svpart{firstline=23,lastline=54}{08_dev_loader/quad_we_mask.sv}
+
+The 16 mask bits \cc{{we00, we01, we10, we11}} correspond to the 16 nibbles of
+the quad, the first bit to bits 63--60. A byte is two nibbles, so a byte store
+at offset $o$ sets bits $2o$ and $2o+1$ counted from the left: \cc{16'hC000}
+for offset 0, \cc{16'h3000} for offset 1, and so on. Here is a byte store of
+\cc{0xAB} at offset 5:
+\[
+\begin{array}{lll}
+\text{\cc{data_in}} & \mathtt{0x00000000000000AB} & \\
+\text{to the top} & \mathtt{0xAB00000000000000} & \text{(\cc{quad_ext_low})} \\
+\text{shifted right by } 8 \cdot 5 = 40 & \mathtt{0x0000000000AB0000} &
+  \text{(\cc{quad_rshift})} \\
+\text{mask} & \mathtt{0x0030} = 0000\;0000\;0011\;0000_2 &
+  \text{(\cc{quad_we_mask})}
+\end{array}
+\]
+The mask enables two nibbles of \cc{spram10}, and there the 16 bits are
+\cc{0x00AB}: exactly the byte \cc{0xAB} lands in bits 23 to 16 of the quad,
+and the other seven bytes in memory stay as they were.
+
+For words and longs, the mask is set only if the offset is a multiple of the
+size. A store to an unaligned address, say a word at offset 1, writes
+nothing.
+
+\begin{exercise}
+\label{ex:step08-fetch}
+The quad at tag $t$ is \cc{0x0123456789ABCDEF}. What does a word fetch from
+address $8t + 6$ deliver? And a word fetch from $8t + 5$? What happens with a
+word store to $8t + 5$?
+\end{exercise}
+
+\begin{exercise}
+\label{ex:step08-store}
+A long \cc{0xDEADBEEF} is stored at byte address 12. Which tag and offset is
+that, what are \cc{we00} to \cc{we11}, and which 16 bits does each SPRAM get at
+\cc{DATAIN}?
+\end{exercise}
+
+\section{What the Shifters Cost}
+\label{sec:step08-cost}
+
+Two shifters, two extenders and a mask generator: how much hardware is that?
+
+\outputfile{step08_report.txt}
+
+The modules without interface ports appear in the list: the five \cc{quad_*}
+modules together have $129 + 129 + 209 + 209 + 53 = 729$ cells, all of them
+LUTs. That is more than the whole design of step 07, for logic that does
+nothing but move bytes around. Each output bit of a shifter is a multiplexer
+that chooses among up to eight input bits, controlled by three offset bits;
+such a function has up to eleven inputs and needs several 4-input LUTs, and
+there are 64 output bits.
+
+These per-module numbers come from synthesising every module on its own, for
+arbitrary inputs. In the real design, yosys flattens everything and removes
+logic whose inputs are constant or whose outputs are unused. In this step the
+loader and the debugger only access bytes, only the low byte of
+\cc{data_in} is ever set, and only the low byte of \cc{data_out} is used. So the whole design has fewer LUTs than the five modules
+alone:
+
+\outputfile{step08_yosys_stat.txt}
+
+To see what the four shift and extend units cost here, we replaced them by
+plain wires (\cc{assign data_out = data_in;}) and synthesised again: 352 LUTs
+instead of 696. So even in this step they account for half of the LUTs of the
+design. In step 09, where the processor uses all access sizes and all 64 bits,
+the same experiment gives 2843 against 2232 LUTs: there they cost about 600
+LUTs, close to the $129 + 129 + 209 + 209 = 676$ of the report. The slowest path of the design, which limits it to 27.2\,MHz,
+also runs through them: from the register \cc{op} of the loader, through the
+switch, the selection of the data type and the shift and extend logic, to the
+display.
+
+The other number worth noticing: \cc{ICESTORM_SPRAM} 4 of 4. The memory of the
+ULM takes all SPRAMs of the chip.
+
+\section{Two Users, One Memory}
+\label{sec:step08-switch}
+
+\svfile{08_dev_loader/dev_ram_switch.sv}
+
+The switch is a multiplexer for a whole interface. Its ports are modports
+(Section~\ref{sec:step07-interface}), and their roles show the direction of the
+wires: towards the loader and the debugger the switch is a \cc{server} (it
+receives requests and returns \cc{data_out}), towards \cc{dev_ram} it is a
+\cc{client}. The \cc{case} selects which user's requests go to the memory:
+2-to-1 multiplexers for all bits of \cc{op},
+\cc{data_type}, \cc{addr} and \cc{data_in}. The data from the memory goes to
+the selected user, and the other one gets 0.
+
+The debugger:
+
+\svpart{firstline=12,lastline=51}{08_dev_loader/dev_ram_debugger.sv}
+
+The two buttons go through the debouncer of step 07
+(Section~\ref{sec:step07-devio}), so each press gives one pulse of one
+cycle, however much the contacts bounce. \cc{BTN1} fetches address 0 and
+sets the counter \cc{addr} to 1; each \cc{BTN2} fetches the address in
+\cc{addr} and increments it. So the presses \cc{BTN1}, \cc{BTN2},
+\cc{BTN2}, \dots{} read the addresses 0, 1, 2, \dots. The output \cc{out}
+is the address, or with \cc{BTN3} the byte read, both extended to 64 bits.
+\cc{LED4} lights if \cc{out} has bits set above the low byte, which the
+display cannot show: without \cc{BTN3}, from address 256 on.
+
+The directory also contains \cc{dev_io_switch.sv}, the same kind of switch for
+\cc{if_io}. It is not used in this step; step 09 needs it.
+
+\section{The Loader}
+\label{sec:step08-loader}
+
+The loader reads one character at a time from \cc{dev_io} through the
+\cc{client} modport of \cc{if_io}. First, a combinational circuit decides
+whether the character is a hexadecimal digit, and which value it has:
+
+\svpart{firstline=18,lastline=49}{08_dev_loader/dev_loader.sv}
+
+\cc{"0"} is a string literal of one character, and in a comparison it stands
+for its 8-bit ASCII code, \cc{8'h30}. So the \cc{case} compares
+\cc{io.getc_char} with 22 constants, and the block is a function of the 8 bits
+of the character with 5 output bits: a small decoder, a handful of LUTs, not
+a search through a table at run time. The first line gives the outputs their
+values for all other characters, so there are no missing cases.
+
+Then two nibbles become a byte:
+
+\svpart{firstline=55,lastline=101}{08_dev_loader/dev_loader.sv}
+
+The flip-flop \cc{nibble_sel} says which half comes next, 1 for the high
+nibble. When a digit arrives, the loader pops it (\cc{io.getc_pop <= 1}),
+stores its value in \cc{high_nibble} or \cc{low_nibble}, and toggles
+\cc{nibble_sel}. After the low nibble, \cc{new_byte} is 1 for one cycle. A
+character that is neither a digit nor \cc{0x04} is popped and ignored. The
+character \cc{0x04} is ASCII ``end of transmission'', what a terminal sends for
+Ctrl-D; it sets \cc{got_eof}, one cycle later \cc{done} is 1, and the loader
+stops reading. The condition \cc{!io.getc_pop} keeps the loader from popping
+in two consecutive cycles, as required by the FIFO
+(Section~\ref{sec:step07-fifo}).
+
+Finally, each new byte is stored at the next address:
+
+\svpart{firstline=107,lastline=131}{08_dev_loader/dev_loader.sv}
+
+\cc{ram.data_type} is set to \cc{RAM_BYTE} in the \cc{initial} block and never
+changed, and only the low 8 bits of \cc{ram.data_in} are ever written: this is
+the constant input that made the shifters cheaper in
+Section~\ref{sec:step08-cost}.
+
+How fast can the loader take characters? It decides at a clock edge to pop
+(\cc{io.getc_pop <= 1}); in the next cycle the pop happens, and in the cycle
+after that \cc{getc_en} is 0, because \cc{getc_char} still shows the popped
+character (Section~\ref{sec:step07-devio}). So the loader takes at most one
+character every three cycles, and never a stale one.
+
+In the simulation (\cc{make sim}), the testbench delivers the characters
+\cc{0} to \cc{9}, \cc{a}, \cc{b} and \cc{0x04}, one every two clock
+cycles, in the same way as in step 07. That is faster than the loader takes
+them, so several characters wait in the input buffer:
+
+\cpppart{firstline=38,lastline=64}{08_dev_loader/tb_test.cpp}
+
+In the waveform you see \cc{ram.op} at \cc{RAM_STORE} at time 28 with
+address 0 and data \cc{0x01}, then every 12 time units (six clock cycles,
+two characters) the next byte, up to address 5 with \cc{0xab} at time 88,
+and \cc{done} becoming 1 at time 94. Then the testbench plays the user of
+the debugger: it presses \cc{BTN1} once and \cc{BTN2} five times, each press
+bouncing as in step 07, and after each press reads the address and, with
+\cc{BTN3}, the byte from the debugger's output \cc{debugger_out}, which
+\cc{test.sv} marks as \cc{/* verilator public */}:
+
+\outputfile{step08_sim.txt}
+
+Verilator warns about \cc{MULTIDRIVEN} signals in \cc{dev_loader.sv}: as in
+step 02, these are the \cc{initial} blocks that set power-up values.
+
+\begin{exercise}
+\label{ex:step08-loader}
+What does the loader store if you type \cc{3 2 1} (return) \cc{0} and then
+Ctrl-D? What if you type \cc{123} and Ctrl-D? What does the display show, and
+is \cc{LED4} on, before you press Ctrl-D in the second case?
+\end{exercise}
+
+\begin{pitfall}
+A testbench that delivers characters at the speed of the real UART would
+never have found the problem of the pitfall in Section~\ref{sec:step07-devio}:
+at 9600 baud the loader has taken each character long before the next
+arrives. With the earlier version of \cc{dev_io}, the testbench above shows
+the loader storing \cc{00 12 34 56 78 9a} instead of \cc{01 23 45 67 89 ab}:
+it reads the stale \cc{'0'} a second time, pops the \cc{'1'} without having
+read it, and so on. The \cc{0x04} is popped unread as well, so the loader is
+never done. Test at the limits, not only at the speed you expect.
+\end{pitfall}
+
+\section{A Declaration Is Not a Connection}
+\label{sec:step08-rst}
+
+The reset of the loader is wired in \cc{test.sv} in two lines:
+\begin{lstlisting}
+logic rst;
+assign rst = BTN1 & BTN3;
+\end{lstlisting}
+An earlier version said it in one line,
+\begin{lstlisting}
+logic rst = BTN1 & BTN3;
+\end{lstlisting}
+which looks the same, but in SystemVerilog it is something else: \cc{=} in
+the declaration of a variable gives it an \emph{initial value}, computed once
+at the start, just like an \cc{initial} block (Chapter~\ref{ch:step02}).
+After that, nothing drives \cc{rst}. A tiny test with Verilator:
+\begin{lstlisting}
+module tb;
+  logic a = 0, b = 0;
+  logic r = a & b;
+  initial begin
+    #1 a = 1; b = 1;
+    #1 $display("a=%b b=%b r=%b", a, b, r);
+    $finish;
+  end
+endmodule
+\end{lstlisting}
+\outputfile{step08_rinit.txt}
+yosys interpreted the line differently. Its log for the earlier version said
+\outputfile{step08_yosys_rst.txt}
+which means it built combinational logic for \cc{rst}, as for an \cc{assign}.
+So on the board the two buttons did reset the loader, but in the simulation
+\cc{rst} stayed 0 forever, whatever the testbench did with the buttons.
+
+\begin{pitfall}
+Never write \cc{logic x = expression;} for a signal that should follow the
+expression. Write \cc{logic x;} and \cc{assign x = expression;}. With a
+constant, as in \cc{logic rst = 0;} of step 07, the declaration is fine: it is
+a power-up value.
+\end{pitfall}
+
+\begin{exercise}
+\label{ex:step08-rst}
+Extend the testbench: after reading the memory, it presses \cc{BTN1} and
+\cc{BTN3} together for five clock cycles, sets \cc{numLoaded} to 0 and
+replaces the characters in \cc{prog} by \cc{fedcba987654}, so that they are
+sent again, waits for \cc{LED3}, and reads the memory again with the
+debugger. What do you expect? Why may the reset come straight from the
+buttons, without a debouncer? And what would the simulation have shown with
+the earlier declaration of \cc{rst}?
+\end{exercise}
+
+\section{What Is Next}
+
+We now have everything around a processor: an I/O device with buffers, a
+memory of 128\,KiB with byte, word, long and quad accesses, and a loader that
+puts a program into it. What is missing is the processor itself: registers, an
+ALU, and a control unit that fetches instructions from the memory, decodes
+and executes them. That is step 09, the ULM.
+
+\solutions
+
+\solution
+Offset 6: shifted left by 48 bits, the quad is \cc{0xCDEF000000000000}, and
+the top 16 bits zero-extended give \cc{0x000000000000CDEF}. Offset 5: shifted
+by 40 bits, \cc{0xABCDEF0000000000}, so the result is \cc{0xABCD}: unaligned
+fetches deliver the two bytes at addresses $8t+5$ and $8t+6$, as long as they
+are in the same quad. An unaligned word store writes nothing, since
+\cc{quad_we_mask} has no case for a word at offset 5 and leaves the mask 0.
+
+\solution
+$12 = 8 \cdot 1 + 4$: tag 1, offset 4. The mask is \cc{16'h00FF}, so
+\cc{we00} = \cc{we01} = \cc{4'b0000} and \cc{we10} = \cc{we11} =
+\cc{4'b1111}. \cc{quad_ext_low} gives \cc{0xDEADBEEF00000000}, \cc{quad_rshift}
+by 32 bits gives \cc{0x00000000DEADBEEF}. So \cc{spram00} and \cc{spram01} get
+\cc{0x0000} (and do not write it), \cc{spram10} gets \cc{0xDEAD} and
+\cc{spram11} gets \cc{0xBEEF}, both written at address 1.
+
+\solution
+Spaces and the return character are skipped, so \cc{3 2 1}, return, \cc{0}
+stores \cc{0x32} at address 0 and \cc{0x10} at address 1, just like
+\cc{3210}. With \cc{123}, the loader stores \cc{0x12} at address 0. The
+\cc{3} becomes the high nibble of the next byte: \cc{low_nibble} is set to 0,
+so the display shows \cc{30}, and since \cc{nibble_sel} is 0, \cc{byte_valid}
+is 0 and \cc{LED4} is on. Ctrl-D ends the loading anyway; the incomplete byte
+is never stored.
+
+\solution
+\cc{LED3} goes off with the reset, the loader is done again 43 cycles after
+the reset, and the debugger reads \cc{fe dc ba 98 76 54} at the
+addresses 0 to 5: the reset cleared \cc{done}, \cc{nibble_sel} and the
+loader's \cc{addr}, so the stores started at address 0 again. The five
+cycles of \cc{BTN1} are far too short for the debouncer of the debugger, so
+it does not fetch. A reset needs no debouncer because it is idempotent
+(Chapter~\ref{ch:step04}): resetting several times in a row, as a bouncing
+button would, has the same effect as resetting once. With the earlier
+declaration, \cc{rst} would have stayed 0 in the simulation: \cc{LED3} would
+stay on, no characters would be taken, and the debugger would read the old
+bytes \cc{01 23 45 67 89 ab}.

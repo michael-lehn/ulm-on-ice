@@ -21,28 +21,28 @@ module test (
     logic tic = 0;
 
     always_ff @ (posedge CLK) begin
-	posEdgeCount <= posEdgeCount + 1;
-	tic <= 0;
-	if (posEdgeCount == CLK_FREQ) begin
-	    posEdgeCount <= 0;
-	    tic <= 1;
-	end
+        posEdgeCount <= posEdgeCount + 1;
+        tic <= 0;
+        if (posEdgeCount == CLK_FREQ - 1) begin
+            posEdgeCount <= 0;
+            tic <= 1;
+        end
     end
 
 
     logic [7:0] hex_val = 8'h0;
 
     always_ff @ (posedge CLK) begin
-	if (tic) begin
-	    hex_val <= hex_val + 1;
-	end
+        if (tic) begin
+            hex_val <= hex_val + 1;
+        end
     end
 
     dev_hex dev_hex0 (
-	.clk(CLK),
-	.en(1'b1),
-	.hex_val(hex_val),
-	.hex_pins(hex_pins)
+        .clk(CLK),
+        .en(1'b1),
+        .hex_val(hex_val),
+        .hex_pins(hex_pins)
     );
 
 endmodule

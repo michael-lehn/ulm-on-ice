@@ -1,0 +1,4 @@
+=== top ===
+       11 cells
+        3   SB_LUT4
+        8   SB_RAM40_4K

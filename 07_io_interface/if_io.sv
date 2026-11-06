@@ -14,23 +14,23 @@ interface if_io;
     /* verilator lint_on UNUSEDSIGNAL */
 
     modport server(
-	input getc_pop,
-	input putc_push,
-	input putc_char,
-	output inbuf_full,
-	output getc_en,
-	output getc_char,
-	output putc_push_done
+        input getc_pop,
+        input putc_push,
+        input putc_char,
+        output inbuf_full,
+        output getc_en,
+        output getc_char,
+        output putc_push_done
     );
 
     modport client(
-	output getc_pop,
-	output putc_push,
-	output putc_char,
-	input inbuf_full,
-	input getc_en,
-	input getc_char,
-	input putc_push_done
+        output getc_pop,
+        output putc_push,
+        output putc_char,
+        input inbuf_full,
+        input getc_en,
+        input getc_char,
+        input putc_push_done
     );
 
 endinterface

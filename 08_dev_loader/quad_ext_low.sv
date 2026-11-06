@@ -16,25 +16,25 @@ module quad_ext_low (
 );
 
     always_comb begin
-	case (data_type)
-	    default:
-		data_out = data_in;
-	    RAM_LONG:
-		data_out = {
-		    data_in[RAM_LONG_SIZE-1:0],
-		    {RAM_QUAD_SIZE-RAM_LONG_SIZE{1'b0}}
-		};
-	    RAM_WORD:
-		data_out = {
-		    data_in[RAM_WORD_SIZE-1:0],
-		    {RAM_QUAD_SIZE-RAM_WORD_SIZE{1'b0}}
-		};
-	    RAM_BYTE:
-		data_out = {
-		    data_in[RAM_BYTE_SIZE-1:0],
-		    {RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}}
-		};
-	endcase
+        case (data_type)
+            default:
+                data_out = data_in;
+            RAM_LONG:
+                data_out = {
+                    data_in[RAM_LONG_SIZE-1:0],
+                    {RAM_QUAD_SIZE-RAM_LONG_SIZE{1'b0}}
+                };
+            RAM_WORD:
+                data_out = {
+                    data_in[RAM_WORD_SIZE-1:0],
+                    {RAM_QUAD_SIZE-RAM_WORD_SIZE{1'b0}}
+                };
+            RAM_BYTE:
+                data_out = {
+                    data_in[RAM_BYTE_SIZE-1:0],
+                    {RAM_QUAD_SIZE-RAM_BYTE_SIZE{1'b0}}
+                };
+        endcase
     end
 
 endmodule

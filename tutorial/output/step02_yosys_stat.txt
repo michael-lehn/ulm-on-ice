@@ -1,0 +1,16 @@
+2.60. Printing statistics.
+
+=== test ===
+
+        +----------Local Count, excluding submodules.
+        | 
+        5 wires
+        5 wire bits
+        5 public wires
+        5 public wire bits
+        3 ports
+        3 port bits
+        4 submodules
+        2   SB_DFF
+        2   SB_LUT4
+

@@ -1,0 +1,144 @@
+\chapter{Glossary}
+\label{app:glossary}
+
+The chapter in parentheses is where a term is introduced.
+
+\begin{description}
+\item[\cc{always_comb}] A block describing combinational logic: its outputs
+  follow its inputs, without memory. Assignments with \cc{=}.
+  (Chapter~\ref{ch:step01})
+\item[\cc{always_ff}] A block describing flip-flops, here always written as
+  \cc{always_ff @ (posedge clock)}: the signals assigned in it take their new
+  values at the rising edge of the clock. Assignments with \cc{<=}.
+  (Chapter~\ref{ch:step02})
+\item[\cc{assign}] A permanent connection: the left side is a wire that always
+  carries the value of the right side. (Chapter~\ref{ch:step01})
+\item[Baud rate] The number of bits per second on a serial line.
+  (Chapter~\ref{ch:step06})
+\item[Attribute] A hint for the tools, attached to a declaration and
+  written between \cc{(*} and \cc{*)}, for example \cc{(* no_rw_check *)}
+  for a memory.
+  (Chapter~\ref{ch:step07})
+\item[Bitstream] The configuration of the FPGA as a bit pattern, written by
+  icepack into \cc{test.bin}. (Chapter~\ref{ch:overview})
+\item[Block RAM] One of the 30 memory blocks of 4\,kbit of the iCE40UP5K
+  (\cc{SB_RAM40_4K}). yosys uses them for arrays that are read through a
+  register. (Chapter~\ref{ch:step07})
+\item[Bouncing] A mechanical button opens and closes several times within a
+  few milliseconds before it settles. (Chapter~\ref{ch:step02})
+\item[Carry chain] Dedicated wiring between neighbouring logic cells for the
+  carry bits of an adder (\cc{SB_CARRY}). (Chapter~\ref{ch:step03})
+\item[Clock domain] All flip-flops driven by the same clock.
+  (Chapter~\ref{ch:step05})
+\item[Clock enable] An input of a flip-flop that decides whether it takes
+  over its data input at a clock edge (\cc{SB_DFFE}). A counter with an enable
+  divides the clock without creating a new clock. (Chapter~\ref{ch:step03})
+\item[Combinational logic] Logic without memory: its outputs are a function
+  of its current inputs. (Chapter~\ref{ch:step01})
+\item[Concatenation] \cc{\{a, b\}}: the bits of \cc{a} followed by those of
+  \cc{b}, as one vector. (Chapter~\ref{ch:step03})
+\item[Control unit] The part of the processor that fetches, decodes and
+  executes instructions, as a state machine. (Chapter~\ref{ch:step09})
+\item[Critical path] The slowest path between two flip-flops (or pins). Its
+  delay determines the highest possible clock frequency.
+  (Chapter~\ref{ch:step01})
+\item[Debouncer] A circuit that accepts a new level of a button only after
+  it has been stable for some milliseconds, and reports each press as a
+  single-cycle pulse. (Chapters~\ref{ch:step05} and~\ref{ch:step07})
+\item[Decoder] The combinational logic that turns the bits of an instruction
+  into the control signals of the datapath. (Chapters~\ref{ch:step05}
+  and~\ref{ch:step09})
+\item[DSP block] A hard multiplier on the chip (\cc{SB_MAC16}); the
+  iCE40UP5K has eight. (Chapter~\ref{ch:step09})
+\item[FIFO] A first-in, first-out buffer: a memory with a write pointer and a
+  read pointer, used as a ring. (Chapter~\ref{ch:step07})
+\item[Flip-flop] A one-bit memory that takes over its input at the rising edge
+  of its clock. Every logic cell has one. (Chapter~\ref{ch:step02})
+\item[Fmax] The highest clock frequency at which the critical path still
+  settles in time, as computed by nextpnr. (Chapter~\ref{ch:step02})
+\item[FPGA] Field programmable gate array: a chip of configurable logic cells,
+  routing, I/O pins and memory blocks. (Chapter~\ref{ch:overview})
+\item[\cc{function}] A function in SystemVerilog. In our designs it computes
+  constants while the tools process the design. (Chapter~\ref{ch:step06})
+\item[Global network] One of eight wires that reach every flip-flop of the
+  chip with little delay, used for clocks (\cc{SB_GB}).
+  (Chapter~\ref{ch:step03})
+\item[\cc{initial}] In our designs: the value a flip-flop has right after the
+  FPGA is configured. (Chapter~\ref{ch:step02})
+\item[Instantiation] Using a module inside another one, like a subcircuit in
+  CircuitVerse. Each instance is its own copy of the hardware.
+  (Chapter~\ref{ch:step03})
+\item[\cc{interface}] A named bundle of wires, connected as a whole.
+  (Chapter~\ref{ch:step07})
+\item[Latch] A memory element that is transparent while its enable is
+  active. yosys infers one when an \cc{always_comb} block does not assign a
+  signal in every case, which is almost always a mistake.
+  (Chapters~\ref{ch:step03} and~\ref{ch:step06})
+\item[Logic cell] The basic building block of the FPGA: a LUT with four
+  inputs, a flip-flop, and carry logic. The iCE40UP5K has 5280
+  (\cc{ICESTORM_LC}). (Chapter~\ref{ch:overview})
+\item[\cc{logic}] The type of a signal. Whether it becomes a wire or the
+  output of a flip-flop follows from how it is assigned.
+  (Chapter~\ref{ch:step01})
+\item[LUT] Lookup table: a 16-to-1 multiplexer whose data inputs are
+  configuration bits. It computes any Boolean function of four inputs.
+  (Chapter~\ref{ch:overview})
+\item[\cc{modport}] The view of an interface from one side: which of its wires
+  are inputs and which are outputs there. (Chapter~\ref{ch:step07})
+\item[Metastability] A flip-flop whose input changes right at the clock edge
+  may hang between 0 and 1 for a while. (Chapter~\ref{ch:step04})
+\item[Module] A circuit with ports, between \cc{module} and \cc{endmodule}.
+  (Chapter~\ref{ch:step01})
+\item[Netlist] A list of building blocks and of the wires between them, the
+  result of synthesis (\cc{test.json}). (Chapter~\ref{ch:overview})
+\item[Non-blocking assignment] \cc{<=} in \cc{always_ff}: all right-hand sides
+  are taken from before the clock edge. (Chapter~\ref{ch:step02})
+\item[Part-select] \cc{x[3:0]} or \cc{x[i +: 3]}: some bits of a vector.
+  (Chapter~\ref{ch:step03})
+\item[\cc{package}] A collection of constants and types, used with
+  \cc{import} or \cc{pkg::name}. (Chapter~\ref{ch:step07})
+\item[\cc{parameter}] A constant of a module that can be set differently for
+  each instance. (Chapter~\ref{ch:step06})
+\item[Pin file] \cc{icebreaker.pcf}: the names of the pins of the chip that a
+  top module may use as ports. (Chapter~\ref{ch:overview})
+\item[Place and route] Choosing a physical block for every building block of
+  the netlist and switches for the wires between them; done by nextpnr.
+  (Chapter~\ref{ch:overview})
+\item[PMOD] A simple connector standard for small extension modules.
+  (Chapter~\ref{ch:overview})
+\item[Reduction] \cc{&x}, \cc{|x}, \cc{^x}: the AND, OR or XOR of all bits
+  of a vector. (Chapter~\ref{ch:step07})
+\item[Register file] The registers of a processor, with ports to read and to
+  write them. (Chapters~\ref{ch:step05} and~\ref{ch:step09})
+\item[Replication] \cc{\{n\{a\}\}}: \cc{a} repeated $n$ times, $n$ wires
+  connected to the same signal. (Chapter~\ref{ch:step05})
+\item[Seven-segment display] Seven LEDs arranged as an 8. Our display has two
+  digits that share the segment wires and are switched on in turn
+  (multiplexing). (Chapter~\ref{ch:step03})
+\item[Simulation] Computing how all signals of a design change over time, here
+  with Verilator and a testbench. (Chapter~\ref{ch:step01})
+\item[Sized literal] A constant with a given number of bits, such as
+  \cc{8'h0f} or \cc{1'b1}. (Chapter~\ref{ch:step03})
+\item[SPRAM] One of the four single-port memory blocks of 256\,kbit of the
+  iCE40UP5K (\cc{SB_SPRAM256KA}), together 128\,KiB.
+  (Chapter~\ref{ch:step08})
+\item[State machine] A register holding a state, and combinational logic
+  computing the next state. (Chapters~\ref{ch:step02} and~\ref{ch:step06})
+\item[Synchroniser] Flip-flops that bring an asynchronous input, such as a
+  button or the serial line, into the clock domain of the design.
+  (Chapters~\ref{ch:step04} and~\ref{ch:step06})
+\item[Synthesis] Turning a description into a netlist of the building blocks
+  of the FPGA; done by yosys. (Chapter~\ref{ch:overview})
+\item[Testbench] A program that sets the inputs of a simulated design and
+  records its signals. (Chapter~\ref{ch:step01})
+\item[Top module] The outermost module of a design. Its ports are pins of the
+  chip. (Chapter~\ref{ch:step01})
+\item[\cc{typedef enum}] A type whose values have names, used for the states
+  of state machines. (Chapter~\ref{ch:step06})
+\item[UART] The circuit for a serial line: a start bit, eight data bits (least
+  significant first), a stop bit. (Chapter~\ref{ch:step06})
+\item[Vector] A signal of several bits, such as \cc{logic [7:0] x}.
+  (Chapter~\ref{ch:step03})
+\item[Waveform] The values of signals over time, as recorded in
+  \cc{waveform.vcd} and shown by Surfer or GTKWave. (Chapter~\ref{ch:step01})
+\end{description}

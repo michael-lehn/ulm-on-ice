@@ -1,0 +1,14 @@
+$ make sim
+
+### VERILATING ###
+verilator -Wall --trace --x-assign unique --x-initial unique \
+	-Wno-fatal \
+	-cc test.sv --top-module test \
+	--exe tb_test.cpp
+...
+
+### BUILDING SIM ###
+make -C obj_dir -f Vtest.mk Vtest
+...
+
+### SIMULATING ###

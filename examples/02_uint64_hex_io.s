@@ -17,13 +17,13 @@
         .equ    local1,     local0 - 8      # extend if more than 2 local
                                             # variables are needed
 
-	.data
-msg0:	.string "Type in some 64 bit unsigned integer in hex format\n"
+        .data
+msg0:   .string "Type in some 64 bit unsigned integer in hex format\n"
 msg1:   .string "(you can use lower or upper case letters)\n"
 msg2:   .string "again? (type 'n' to exit, any other key to continue)\n"
 msg3:   .string "Tschüss!\n"
-neq:	.string "n = 0x"
-got:	.string "got: n = 0x"
+neq:    .string "n = 0x"
+got:    .string "got: n = 0x"
 
         .text
 #
@@ -52,7 +52,7 @@ got:	.string "got: n = 0x"
         addq    4 * 8,      %SP,        %SP
 
 .loop
-	putc	'\n'
+        putc    '\n'
 
         // call puts(neq)
         subq    4 * 8,      %SP,        %SP
@@ -71,7 +71,7 @@ got:	.string "got: n = 0x"
         movq    %4,         local0(%FP)
         addq    3 * 8,      %SP,        %SP
 
-	putc	'\n'
+        putc    '\n'
 
         // call puts(got)
         subq    4 * 8,      %SP,        %SP
@@ -83,14 +83,14 @@ got:	.string "got: n = 0x"
 
         // call putux(tmp)
         subq    4 * 8,      %SP,        %SP
-	movq	local0(%FP),%4
+        movq    local0(%FP),%4
         movq    %4,         fparam0(%SP)
         loadz   putux,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	putc	'\n'
-	putc	'\n'
+        putc    '\n'
+        putc    '\n'
 
         // call puts(msg2)
         subq    4 * 8,      %SP,        %SP
@@ -100,11 +100,11 @@ got:	.string "got: n = 0x"
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	getc	%4
-	subq	'n',	    %4,		%0
-	jnz	.loop
+        getc    %4
+        subq    'n',        %4,         %0
+        jnz     .loop
 
-	putc	'\n'
+        putc    '\n'
 
         // call puts(msg3)
         subq    4 * 8,      %SP,        %SP
@@ -114,7 +114,7 @@ got:	.string "got: n = 0x"
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	halt	0
+        halt    0
 
 /*
         uint64_t getux()
@@ -127,41 +127,41 @@ getux:
 
         /* begin of the function body */
 
-	loadz	0,	    %4
+        loadz   0,          %4
 .loop.getux:
-	getc	%5
-	subq	'0',	    %5,		%0
-	jb	.lc.getux
-	subq	'9',	    %5,		%0
-	ja	.lc.getux
-	subq	'0',	    %5,		%5
-	jmp	.add.getux
+        getc    %5
+        subq    '0',        %5,         %0
+        jb      .lc.getux
+        subq    '9',        %5,         %0
+        ja      .lc.getux
+        subq    '0',        %5,         %5
+        jmp     .add.getux
 .lc.getux:
-	subq	'a',	    %5,		%0
-	jb	.uc.getux
-	subq	'f',	    %5,		%0
-	ja	.uc.getux
-	subq	'a',	    %5,		%5
-	addq	10,	    %5,		%5
-	jmp	.add.getux
+        subq    'a',        %5,         %0
+        jb      .uc.getux
+        subq    'f',        %5,         %0
+        ja      .uc.getux
+        subq    'a',        %5,         %5
+        addq    10,         %5,         %5
+        jmp     .add.getux
 .uc.getux:
-	subq	'A',	    %5,		%0
-	jb	.done.getux
-	subq	'F',	    %5,		%0
-	ja	.done.getux
-	subq	'A',	    %5,		%5
-	addq	10,	    %5,		%5
+        subq    'A',        %5,         %0
+        jb      .done.getux
+        subq    'F',        %5,         %0
+        ja      .done.getux
+        subq    'A',        %5,         %5
+        addq    10,         %5,         %5
 .add.getux:
-	shlq	4,	    %4,		%4
-	addq	%5,	    %4,		%4
-	jmp	.loop.getux
+        shlq    4,          %4,         %4
+        addq    %5,         %4,         %4
+        jmp     .loop.getux
 .done.getux:
 
-	movq	%4,	    rval(%FP)
+        movq    %4,         rval(%FP)
 
-	/* end of the function body */
-	
-	// function epilogue
+        /* end of the function body */
+        
+        // function epilogue
         movq    %FP,        %SP
         movq    fp(%SP),    %FP
         movq    ret(%SP),   %RET_ADDR
@@ -184,43 +184,43 @@ putux:
 
         movq    fparam0(%FP),%4
 
-	// tmp = n & 0xF; n = n / 16
-	loadz	0xF,	    %5
-	andq	%5,	    %4,		%5
-	movq	%5,	    local0(%FP)
-	shrq	4,	    %4,		%4
-	movq	%4,	    fparam0(%FP)
+        // tmp = n & 0xF; n = n / 16
+        loadz   0xF,        %5
+        andq    %5,         %4,         %5
+        movq    %5,         local0(%FP)
+        shrq    4,          %4,         %4
+        movq    %4,         fparam0(%FP)
 
-	// if (n / 16 != 0) {
-	subq	0,	    %4,		%0
-	jz	.print.putux
+        // if (n / 16 != 0) {
+        subq    0,          %4,         %0
+        jz      .print.putux
 
-	// putux(n / 16)
-	subq    4 * 8,      %SP,        %SP
+        // putux(n / 16)
+        subq    4 * 8,      %SP,        %SP
         movq    fparam0(%FP),%4
         movq    %4,         fparam0(%SP)
         loadz   putux,       %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	// }
+        // }
 
 .print.putux:
-	// print tmp
-	movq	local0(%FP),%4
-	subq	10,	    %4,		%0
-	jb	.dec.putux
-	subq	10,	    %4,		%4
-	addq	'A',	    %4,		%4
-	jmp	.putc.putux
+        // print tmp
+        movq    local0(%FP),%4
+        subq    10,         %4,         %0
+        jb      .dec.putux
+        subq    10,         %4,         %4
+        addq    'A',        %4,         %4
+        jmp     .putc.putux
 .dec.putux:
-	addq	'0',	    %4,		%4
+        addq    '0',        %4,         %4
 .putc.putux:
-	putc	%4
+        putc    %4
 
-	/* end of the function body */
-	
-	// function epilogue
+        /* end of the function body */
+        
+        // function epilogue
         movq    %FP,        %SP
         movq    fp(%SP),    %FP
         movq    ret(%SP),   %RET_ADDR
@@ -255,6 +255,6 @@ puts:
         ret     %RET_ADDR
 
 
-	//
-	// end of text segment 
-	//
+        //
+        // end of text segment 
+        //

@@ -15,21 +15,21 @@ interface if_instr_alu;
     logic [pkg_reg::REG_ADDRW-1:0] a_reg;
 
     modport server(
-	input op,
-	input a_sel,
-	input s_reg,
-	input b_reg,
-	input a_imm,
-	input a_reg
+        input op,
+        input a_sel,
+        input s_reg,
+        input b_reg,
+        input a_imm,
+        input a_reg
     );
 
     modport client(
-	output op,
-	output a_sel,
-	output s_reg,
-	output b_reg,
-	output a_imm,
-	output a_reg
+        output op,
+        output a_sel,
+        output s_reg,
+        output b_reg,
+        output a_imm,
+        output a_reg
     );
 
 endinterface

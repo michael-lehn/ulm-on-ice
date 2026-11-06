@@ -1,0 +1,4 @@
+2.35. Executing MEMORY_LIBMAP pass (mapping memories to cells).
+using FF mapping for memory test.$flatten\dev_hex0.$auto$proc_rom.cc:155:do_switch$540
+mapping memory test.io0.output_buffer.ram_inst.mem via $__ICE40_RAM4K_
+mapping memory test.io0.input_buffer.ram_inst.mem via $__ICE40_RAM4K_

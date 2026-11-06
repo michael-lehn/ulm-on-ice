@@ -1,0 +1,4 @@
+$ make synth
+yosys -ql test.log -p 'synth_ice40 -abc9 -dffe_min_ce_use 4 -device u -dsp -top test -json test.json' test.v
+nextpnr-ice40 --pcf-allow-unconstrained --up5k --package sg48 --json test.json --pcf ../icebreaker.pcf --asc test.asc
+icepack test.asc test.bin

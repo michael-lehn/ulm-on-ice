@@ -1,0 +1,164 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+% Characters missing in Latin Modern Mono (the emoji and Chinese characters in
+% examples/01_hello.s) are taken from macOS fonts, if they exist.
+\directlua{luaotfload.add_fallback("monofallback",
+  {"Arial Unicode MS:mode=harf;", "Apple Color Emoji:mode=harf;"})}
+\setmonofont{Latin Modern Mono}[Scale=0.88,RawFeature={fallback=monofallback}]
+\usepackage[margin=27mm]{geometry}
+\usepackage[skip=\medskipamount,indent=0pt]{parskip}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{fancyvrb}
+\usepackage{etoolbox}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{tikz}
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{arrows.meta,positioning,fit,calc,decorations.pathreplacing,patterns,
+  circuits.logic.US,matrix}
+\usepackage{xurl}
+\usepackage{titlesec}
+\titleformat{\chapter}[display]{\normalfont\bfseries}{\large\chaptertitlename\ \thechapter}{4pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{0pt}{16pt}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!50!black,
+  linktoc=all,
+  bookmarksnumbered=true,
+  bookmarksopen=true,
+  bookmarksopenlevel=0,
+  pdftitle={ULM on ICE: Building a Computer on an FPGA, Step by Step},
+  pdfauthor={Michael C. Lehn}
+}
+
+% Start a section on the next page if it would get only a line or two here.
+\usepackage{needspace}
+\usepackage{placeins}
+\let\plainsection\section
+\renewcommand{\section}{\needspace{6.5\baselineskip}\plainsection}
+
+\definecolor{codebg}{RGB}{247,248,250}
+\definecolor{codekw}{RGB}{0,70,140}
+\definecolor{codecomment}{RGB}{95,105,115}
+\definecolor{termbg}{RGB}{240,242,238}
+\lstdefinestyle{code}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codekw},
+  commentstyle=\color{codecomment},
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{black!15},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=true,
+  tabsize=8,
+  aboveskip=6pt,
+  belowskip=6pt
+}
+\lstdefinelanguage{SystemVerilog}[]{Verilog}{
+  morekeywords={logic,always_comb,always_ff,always_latch,typedef,enum,struct,
+    packed,interface,endinterface,modport,package,endpackage,import,unique,
+    priority,int,bit,byte,shortint,longint,localparam,genvar,generate,
+    endgenerate},
+  sensitive=true
+}
+% Commands typed at a prompt and what they print.
+\lstdefinestyle{term}{
+  style=code,
+  language={},
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{termbg},
+  breaklines=true,
+  breakindent=2em,
+  postbreak={}
+}
+% \endgraf drops the indentation of an enclosing list, so we restore it by hand.
+\makeatletter
+\lstnewenvironment{terminal}{\endgraf\noindent\hskip\@totalleftmargin\minipage{\linewidth}\lstset{style=term}}{\endminipage\endgraf}
+\makeatother
+\lstset{style=code,language=SystemVerilog}
+
+% Files of the repository, given relative to its top directory.  Whole files
+% may break across pages; \svpart keeps a part of a file on one page.
+\newcommand{\svfile}[2][]{\lstinputlisting[language=SystemVerilog,title={\texttt{\detokenize{#2}}},#1]{../#2}}
+\newcommand{\svpart}[2]{\par\noindent\begin{minipage}{\linewidth}\lstinputlisting[language=SystemVerilog,title={\texttt{\detokenize{#2}}},#1]{../#2}\end{minipage}\par}
+\newcommand{\cppfile}[2][]{\lstinputlisting[language=C++,title={\texttt{\detokenize{#2}}},#1]{../#2}}
+\newcommand{\cpppart}[2]{\par\noindent\begin{minipage}{\linewidth}\lstinputlisting[language=C++,title={\texttt{\detokenize{#2}}},#1]{../#2}\end{minipage}\par}
+\newcommand{\makefilepart}[2]{\par\noindent\begin{minipage}{\linewidth}\lstinputlisting[language=make,title={\texttt{\detokenize{#2}}},#1]{../#2}\end{minipage}\par}
+% A file shown verbatim, for files with characters outside of Latin-1, which
+% listings would put in the wrong order (examples/01_hello.s).
+\newcommand{\verbfile}[1]{\par\noindent\begin{tcolorbox}[colback=codebg,colframe=black!15,
+  boxrule=0.4pt,sharp corners,left=3pt,right=3pt,top=2pt,bottom=2pt,
+  title={\texttt{\detokenize{#1}}},coltitle=black,colbacktitle=white,
+  fonttitle=\small,toptitle=0pt,bottomtitle=2pt,halign title=center]
+  \VerbatimInput[fontsize=\small,tabsize=8]{../#1}\end{tcolorbox}\par}
+% Output of the tools, captured in the directory output.
+\newcommand{\outputfile}[1]{\par\noindent\begin{minipage}{\linewidth}\lstinputlisting[style=term,basicstyle=\ttfamily\scriptsize]{output/#1}\end{minipage}\par}
+
+\setlist[description]{leftmargin=1.5em,itemsep=2pt,topsep=2pt,font=\normalfont\bfseries}
+\setlist[itemize]{itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{itemsep=4pt,topsep=2pt}
+\setlength{\emergencystretch}{1.5em}
+
+% Something for the reader to do.
+\definecolor{tryitbar}{RGB}{40,90,190}
+\newcounter{exercise}[chapter]
+\renewcommand{\theexercise}{\thechapter.\arabic{exercise}}
+\newenvironment{exercise}
+  {\par\medskip\refstepcounter{exercise}\noindent
+   \begin{list}{}{\leftmargin=9pt\rightmargin=0pt\topsep=0pt}\item\relax
+   \textcolor{tryitbar}{\textbf{Exercise~\theexercise.}}\ }
+  {\end{list}\medskip}
+
+% Solutions at the end of a chapter, in the order of the exercises.
+\newcounter{solution}[chapter]
+\newcommand{\solutions}{\clearpage\section{Solutions}\setcounter{solution}{0}}
+\newcommand{\solution}{\par\medskip\refstepcounter{solution}\noindent
+  \textcolor{tryitbar}{\textbf{Exercise~\thechapter.\arabic{solution}.}}\ }
+
+% A pitfall.
+\definecolor{warnbar}{RGB}{170,70,20}
+\newenvironment{pitfall}
+  {\par\medskip\noindent
+   \begin{list}{}{\leftmargin=9pt\rightmargin=0pt\topsep=0pt}\item\relax
+   \textcolor{warnbar}{\textbf{Pitfall.}}\ }
+  {\end{list}\medskip}
+
+% Exclusive or: a dotted \lor.
+\newcommand{\xor}{\mathbin{\dot{\lor}}}
+
+% Terms defined in the text.
+\newcommand{\term}[1]{\emph{#1}}
+% Inline code on a light gray background, as on GitHub.
+\definecolor{inlinebg}{RGB}{236,238,241}
+\tcbset{inlinecode/.style={on line,colback=inlinebg,colframe=inlinebg,frame empty,boxrule=0pt,
+  arc=2pt,boxsep=0pt,left=2pt,right=2pt,top=1pt,bottom=1pt,before upper={\vphantom{(}}}}
+% \smash: the background may reach into the line spacing, but never changes it.
+\DeclareRobustCommand{\cc}[1]{\smash{\tcbox[inlinecode]{\ttfamily\detokenize{#1}}}}
+
+% Figures.
+\tikzset{
+  box/.style={draw,rounded corners=2pt,align=center,font=\small},
+  toolbox/.style={box,fill=blue!7,minimum height=9mm},
+  filebox/.style={box,fill=black!5,minimum height=9mm},
+  chipbox/.style={box,fill=green!10},
+  arrow/.style={->,>=Stealth,thick,draw=black!65},
+  biarrow/.style={<->,>=Stealth,thick,draw=black!65},
+  note/.style={font=\footnotesize,align=center,text=black!70},
+  wire/.style={thick,draw=black!80},
+  % timing diagrams: \draw[signal] ... with high at y=0.5, low at y=0
+  signal/.style={thick,draw=blue!60!black},
+  clocksig/.style={thick,draw=black!70},
+}

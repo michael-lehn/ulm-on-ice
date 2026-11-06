@@ -12,11 +12,11 @@ module test (
     output logic A5,
     output logic A6,
     output logic A7,
-    output logic LED1,	// inbuf is empty
-    output logic LED2,	// inbuf is full
-    output logic LED3,	// loader done
-    output logic LED4,	// cpu halted
-    input BTN1		// reset
+    output logic LED1,  // inbuf is empty
+    output logic LED2,  // inbuf is full
+    output logic LED3,  // loader done
+    output logic LED4,  // cpu halted
+    input BTN1          // reset
 );
     // ---------
     // device: hex display
@@ -28,10 +28,10 @@ module test (
     logic dev_hex_en;
 
     dev_hex dev_hex0 (
-	.clk(CLK),
-	.en(dev_hex_en),
-	.hex_val(hex_val),
-	.hex_pins(hex_pins)
+        .clk(CLK),
+        .en(dev_hex_en),
+        .hex_val(hex_val),
+        .hex_pins(hex_pins)
     );
 
     // ---------
@@ -40,28 +40,29 @@ module test (
     localparam CLK_FREQ = 12_000_000;
     localparam BAUD = 9_600;
 
-    logic rst = BTN1;
+    logic rst;
+    assign rst = BTN1;
 
     if_io io();
 
-    assign LED1 = !io.getc_en;	  // inbuf is empty
-    assign LED2 = io.inbuf_full;	  // inbuf is full
+    assign LED1 = !io.getc_en;    // inbuf is empty
+    assign LED2 = io.inbuf_full;          // inbuf is full
 
     initial begin
-	io.getc_pop = 0;
-	io.putc_push = 0;
-	io.putc_char = 0;
+        io.getc_pop = 0;
+        io.putc_push = 0;
+        io.putc_char = 0;
     end
 
     dev_io #(
-	.CLK_FREQ(CLK_FREQ),
-	.BAUD(BAUD)
+        .CLK_FREQ(CLK_FREQ),
+        .BAUD(BAUD)
     ) io0(
-	.clk(CLK),
-	.rst(rst),
-	.rx(RX),
-	.tx(TX),
-	.io(io.server)
+        .clk(CLK),
+        .rst(rst),
+        .rx(RX),
+        .tx(TX),
+        .io(io.server)
     );
 
     // ---------
@@ -70,8 +71,8 @@ module test (
     if_alu alu();
 
     dev_alu dev_alu0(
-	.clk(CLK),
-	.alu(alu.server)
+        .clk(CLK),
+        .alu(alu.server)
     );
 
     // ---------
@@ -80,8 +81,8 @@ module test (
     if_reg_file reg_file();
 
     dev_reg_file dev_reg_file0(
-	.clk(CLK),
-	.reg_file(reg_file.server)
+        .clk(CLK),
+        .reg_file(reg_file.server)
     );
 
     // ---------
@@ -90,8 +91,8 @@ module test (
     if_ram ram();
 
     dev_ram ram0(
-	.clk(CLK),
-	.ram(ram.server)
+        .clk(CLK),
+        .ram(ram.server)
     );
 
     // ---------
@@ -103,10 +104,10 @@ module test (
     assign LED3 = loader_done;
 
     dev_ram_switch dev_ram_switch0(
-	.select(loader_done),
-	.ram0(ram_loader.server),
-	.ram1(ram_cpu.server),
-	.ram(ram.client)
+        .select(loader_done),
+        .ram0(ram_loader.server),
+        .ram1(ram_cpu.server),
+        .ram(ram.client)
     );
 
     // ---------
@@ -115,10 +116,10 @@ module test (
     if_io io_loader(), io_cpu();
     
     dev_io_switch dev_io_switch0(
-	.select(loader_done),
-	.io0(io_loader.server),
-	.io1(io_cpu.server),
-	.io(io.client)
+        .select(loader_done),
+        .io0(io_loader.server),
+        .io1(io_cpu.server),
+        .io(io.client)
     );
 
     // ---------
@@ -128,17 +129,17 @@ module test (
     logic loader_byte_valid;
 
     dev_loader dev_loader0(
-	.clk(CLK),
-	.rst(rst),
-	.io(io_loader.client),
-	.ram(ram_loader.client),
-	.done(loader_done),
-	.byte_val(loader_byte_val),
-	.byte_valid(loader_byte_valid)
+        .clk(CLK),
+        .rst(rst),
+        .io(io_loader.client),
+        .ram(ram_loader.client),
+        .done(loader_done),
+        .byte_val(loader_byte_val),
+        .byte_valid(loader_byte_valid)
     );
 
-    logic cpu_halted;
-    logic [pkg_ram::RAM_BYTE_SIZE-1:0] cpu_exit_code;
+    logic cpu_halted /* verilator public */;
+    logic [pkg_ram::RAM_BYTE_SIZE-1:0] cpu_exit_code /* verilator public */;
 
     assign dev_hex_en = !loader_done || cpu_halted;
 
@@ -146,22 +147,29 @@ module test (
     // device: control unit
 
     dev_cu dev_cu0(
-	.clk(CLK),
-	.en(loader_done),
-	.rst(rst),
-	.ram(ram_cpu.client),
-	.reg_file(reg_file.client),
-	.io(io_cpu.client),
-	.alu(alu.client),
-	.halted(cpu_halted),
-	.exit_code(cpu_exit_code)
+        .clk(CLK),
+        .en(loader_done),
+        .rst(rst),
+        .ram(ram_cpu.client),
+        .reg_file(reg_file.client),
+        .io(io_cpu.client),
+        .alu(alu.client),
+        .halted(cpu_halted),
+        .exit_code(cpu_exit_code)
     );
 
+    // for the testbench: the CPU has sent a character
+    logic cpu_putc_done /* verilator public */;
+    logic [pkg_ram::RAM_BYTE_SIZE-1:0] cpu_putc_char /* verilator public */;
+
+    assign cpu_putc_done = io_cpu.putc_push_done;
+    assign cpu_putc_char = io_cpu.putc_char;
+
     assign LED4 = loader_done
-	? cpu_halted
-	: loader_byte_valid;
+        ? cpu_halted
+        : loader_byte_valid;
     assign hex_val = loader_done
-	? cpu_exit_code
-	: loader_byte_val;
+        ? cpu_exit_code
+        : loader_byte_val;
 
 endmodule

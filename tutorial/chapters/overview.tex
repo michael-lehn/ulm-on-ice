@@ -1,0 +1,256 @@
+\chapter{The Big Picture}
+\label{ch:overview}
+
+Before we describe a single circuit, we need a mental model of the chip that
+will contain it. This chapter answers three questions: what is inside an FPGA,
+what is on our board, and which tools bring a description in SystemVerilog onto
+the chip.
+
+\section{What an FPGA Is}
+\label{sec:fpga}
+
+A processor, say the CPU of your laptop, is a fixed circuit. It was designed
+once, and all chips of this type contain the same gates connected by the same
+wires. What changes is the program it runs.
+
+An FPGA, a \term{field programmable gate array}, is different. It is a chip
+that consists of a large number of small, identical building blocks and of
+wires between them, and both are \emph{configurable}: which Boolean function a
+block computes, and which blocks are connected to which. The configuration is
+loaded into the chip when it is switched on. So the circuit itself is what we
+change, not a program running on it. If we configure an FPGA as a processor,
+then this processor can in turn run programs, and that is exactly what we do
+in the last step.
+
+The building blocks of our FPGA, a Lattice iCE40UP5K, come in a few kinds:
+\begin{description}
+\item[Logic cells.] The workhorse. A logic cell consists of a lookup table with
+  four inputs, a flip-flop, and a little extra logic for adding numbers. The
+  iCE40UP5K has 5280 of them.
+\item[Routing.] Wires between the logic cells, with switches that decide which
+  wires are connected. Most of the area of an FPGA is routing, not logic.
+\item[I/O pins.] The connections to the outside world, here buttons, LEDs, the
+  display and the USB chip on the board.
+\item[Memory blocks.] Ready-made memory, because building memory from
+  flip-flops would use up the logic cells quickly. We meet them in
+  Chapter~\ref{ch:step07}.
+\end{description}
+The lookup table is the part that needs explaining, and it is simpler than its
+name suggests.
+
+\section{A Lookup Table Is a Multiplexer}
+\label{sec:lut}
+
+You know the multiplexer from CircuitVerse: it has data inputs, control inputs,
+and one output, and the control bits select which data input appears at the
+output. A multiplexer with four control bits selects one of $2^4 = 16$ data
+inputs.
+
+Now take such a 16-to-1 multiplexer and do not connect its data inputs to
+signals. Instead, fix each of them to a constant 0 or 1 when the chip is
+configured. These 16 constants are the \term{configuration bits} of the
+lookup table, and the four control inputs are its actual inputs
+(Figure~\ref{fig:lut}). This is a \term{lookup table}, or \term{LUT} for short.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % the multiplexer
+  \draw[thick,fill=green!8] (0,0) -- (0,64) -- (18,54) -- (18,10) -- cycle;
+  \node[font=\small] at (9,32) {MUX};
+  \foreach \k in {0,...,15} {
+    \pgfmathsetmacro{\y}{60-3.7*\k}
+    \draw[wire] (-12,\y) -- (0,\y);
+    \node[font=\scriptsize,anchor=east] at (-12,\y) {$t_{\k}$};
+  }
+  \node[note,anchor=east] at (-20,32) {16 configuration\\bits, set when\\the FPGA is\\configured};
+  \draw[decorate,decoration={brace,amplitude=4pt},thick,black!60]
+    (-19,2) -- (-19,62);
+  \foreach \j/\name in {0/x_0,1/x_1,2/x_2,3/x_3} {
+    \pgfmathsetmacro{\x}{3+4*\j}
+    \draw[wire] (\x,-8) -- (\x,{\x*10/18});
+    \node[font=\scriptsize,anchor=north] at (\x,-8) {$\name$};
+  }
+  \node[note,anchor=north] at (9,-13) {inputs of the LUT\\(control bits of the multiplexer)};
+  \draw[wire] (18,32) -- (32,32) node[right,font=\small] {$f(x_3,x_2,x_1,x_0) = t_{8x_3+4x_2+2x_1+x_0}$};
+\end{tikzpicture}
+\caption{A lookup table with four inputs: a 16-to-1 multiplexer whose data
+inputs are constants. The inputs of the LUT select one of them.}
+\label{fig:lut}
+\end{figure}
+
+What does such a LUT compute? The four input bits, read as a binary number
+$i = 8x_3 + 4x_2 + 2x_1 + x_0 \in \{0, \dots, 15\}$, select the configuration
+bit $t_i$. So the LUT computes the Boolean function
+\[
+  f\colon \{0,1\}^4 \to \{0,1\}, \qquad
+  f(x_3, x_2, x_1, x_0) = t_{8x_3+4x_2+2x_1+x_0},
+\]
+and the 16 configuration bits are nothing but the last column of its truth
+table. Every Boolean function of four variables has a truth table with 16 rows,
+so a LUT can compute \emph{every} such function: there are $2^{16} = 65536$ of
+them, one for each way to choose the configuration bits.
+
+This is the whole trick of an FPGA. There are no AND or OR gates on the chip
+waiting to be connected. A circuit that you draw with gates is translated into
+Boolean functions of at most four inputs each, and every one of these functions
+becomes a LUT with the right 16 bits. A function of more than four inputs is
+split into several LUTs, the output of one feeding an input of the next.
+
+\begin{exercise}
+Which configuration bits $t_0, \dots, t_{15}$ make a LUT compute the
+function $f(x_3,x_2,x_1,x_0) = x_3 \wedge x_2$? Which ones make it compute
+$x_0 \xor x_1 \xor x_2 \xor x_3$?
+\end{exercise}
+
+\section{Flip-Flops, and Why the Clock Matters}
+\label{sec:ff-intro}
+
+A circuit of LUTs alone is combinational: its outputs depend only on its
+current inputs. To store something we need flip-flops, and every logic cell has
+one right behind its LUT. The output of the LUT can go out of the logic cell
+directly, or into the flip-flop, which takes it over at the rising edge of a
+clock.
+
+On our board a crystal oscillator delivers a clock of 12\,MHz, that is
+$12 \cdot 10^6$ rising edges per second, one every $83.3$\,ns. All flip-flops
+in our designs use this one clock (or are meant to, see
+Section~\ref{sec:step02-pins}). Between two edges, the signals have to travel
+from the flip-flops through LUTs and wires to the next flip-flops and settle
+there. This takes time, and so the tools tell us after placing the design how
+fast the clock could be. For our larger designs this will be a real
+limitation.
+
+\section{The Board}
+\label{sec:board}
+
+The iCEBreaker (Figure~\ref{fig:board}) carries the FPGA, the 12\,MHz
+oscillator, a flash memory that stores the configuration, and a USB chip. The
+USB chip has two jobs: it writes the configuration into the flash, and it
+provides a serial line between your computer and the FPGA, which we use from
+Chapter~\ref{ch:step06} on.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=6mm and 22mm]
+  \node[chipbox,minimum width=34mm,minimum height=24mm] (fpga) {iCE40UP5K\\[-2pt]\footnotesize FPGA};
+  \node[box,fill=black!5,left=of fpga,minimum width=24mm,minimum height=10mm,yshift=8mm] (usb) {USB chip\\[-2pt]\footnotesize FTDI FT2232H};
+  \node[box,fill=black!5,left=of fpga,minimum width=24mm,minimum height=10mm,yshift=-8mm] (flash) {flash\\[-2pt]\footnotesize 16\,MiB};
+  \node[box,fill=black!5,above=of fpga,minimum width=24mm] (osc) {oscillator\\[-2pt]\footnotesize 12\,MHz};
+  \node[box,fill=yellow!12,right=12mm of fpga,minimum width=28mm,yshift=10mm] (pmod1) {PMOD 1A\\[-2pt]\footnotesize 7-segment display};
+  \node[box,fill=yellow!12,right=12mm of fpga,minimum width=28mm,yshift=-10mm] (pmod2) {PMOD 2\\[-2pt]\footnotesize 3 buttons, 5 LEDs};
+  \node[left=10mm of usb,note] (pc) {your\\computer};
+  \draw[biarrow] (pc) -- node[above,note]{USB} (usb);
+  \draw[arrow] (usb) -- node[left,note]{writes} (flash);
+  \draw[arrow] (flash) -- node[above,note]{configuration} (fpga.west |- flash);
+  \draw[biarrow] (usb) -- node[above,note]{serial} (fpga.west |- usb);
+  \draw[arrow] (osc) -- node[right,note]{clock} (fpga);
+  \draw[biarrow] (fpga.east |- pmod1) -- (pmod1);
+  \draw[biarrow] (fpga.east |- pmod2) -- (pmod2);
+\end{tikzpicture}
+\caption{What is on the board, and how the parts are connected.}
+\label{fig:board}
+\end{figure}
+
+The FPGA forgets its configuration when the power goes off. At power-up it
+reads the configuration from the flash, and so the flash is what we program.
+
+On the right edge of the board are connectors in the PMOD format, a simple
+standard for small extension modules. On one we plug the module with three
+buttons and five LEDs, on another the 7-segment display with two digits.
+
+Which wire of the FPGA leads to which button is not something the FPGA knows.
+The file \cc{icebreaker.pcf} at the top of the repository gives the pins of
+the chip names that we can use in our designs. A few lines of it:
+\begin{terminal}
+# 12 MHz clock
+set_io -nowarn CLK        35
+...
+# LEDs and Buttons (PMOD 2)
+set_io -nowarn LED1       26
+set_io -nowarn LED2       27
+...
+set_io -nowarn BTN1       20
+set_io -nowarn BTN2       19
+\end{terminal}
+So pin 35 of the chip is called \cc{CLK}, and pin 20 \cc{BTN1}. When a design
+has an input called \cc{BTN1}, it is connected to the first button.
+
+\section{From a Description to a Configured Chip}
+\label{sec:toolflow}
+
+Between the SystemVerilog file and the configured chip there are four tools,
+and it pays to know what each of them does. Each one reads a file and writes
+the next (Figure~\ref{fig:toolflow}).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=5mm and 7mm]
+  \node[filebox] (sv) {\cc{test.sv}};
+  \node[toolbox,right=of sv] (sv2v) {\textbf{sv2v}\\[-2pt]\footnotesize translate};
+  \node[filebox,right=of sv2v] (v) {\cc{test.v}};
+  \node[toolbox,right=of v] (yosys) {\textbf{yosys}\\[-2pt]\footnotesize synthesize};
+  \node[filebox,right=of yosys] (json) {\cc{test.json}};
+  \node[toolbox,below=9mm of json] (pnr) {\textbf{nextpnr}\\[-2pt]\footnotesize place \& route};
+  \node[filebox,left=of pnr] (asc) {\cc{test.asc}};
+  \node[toolbox,left=of asc] (pack) {\textbf{icepack}\\[-2pt]\footnotesize pack bits};
+  \node[filebox,left=of pack] (bin) {\cc{test.bin}};
+  \node[toolbox,left=of bin] (prog) {\textbf{iceprog}\\[-2pt]\footnotesize write flash};
+  \node[filebox,right=of pnr] (pcf) {\cc{icebreaker.pcf}};
+  \draw[arrow] (sv) -- (sv2v); \draw[arrow] (sv2v) -- (v);
+  \draw[arrow] (v) -- (yosys); \draw[arrow] (yosys) -- (json);
+  \draw[arrow] (json) -- (pnr); \draw[arrow] (pcf) -- (pnr);
+  \draw[arrow] (pnr) -- (asc); \draw[arrow] (asc) -- (pack);
+  \draw[arrow] (pack) -- (bin); \draw[arrow] (bin) -- (prog);
+\end{tikzpicture}
+\caption{The tools between a description in SystemVerilog and the
+configuration in the flash of the board. \cc{make synth} runs everything up to
+\cc{test.bin}, \cc{make prog} also \cc{iceprog}.}
+\label{fig:toolflow}
+\end{figure}
+
+\begin{description}
+\item[sv2v] translates SystemVerilog into plain Verilog. Verilog is the older
+  language from which SystemVerilog grew; yosys understands only part of
+  SystemVerilog, but all of Verilog. For our first designs the translation
+  hardly changes anything; later, SystemVerilog features such as interfaces
+  and packages are translated into Verilog that means the same.
+\item[yosys] \term{synthesizes} the design: it turns the description into a
+  \term{netlist}, a list of the building blocks of our FPGA (LUTs with their 16
+  bits, flip-flops, memory blocks) and of the wires between them. It also
+  simplifies the logic as far as it can. Nothing is placed on the chip yet.
+\item[nextpnr] \term{places} every building block of the netlist on one of the
+  physical blocks of the chip and \term{routes} the wires, that is, it chooses
+  the switches of the routing so that the right blocks are connected. Here the
+  pin names from \cc{icebreaker.pcf} come in. Then it computes how long the
+  signals take, and how fast the clock may be.
+\item[icepack] converts the result into the bit pattern that the FPGA loads at
+  power-up, the \term{bitstream}.
+\item[iceprog] writes the bitstream through USB into the flash and restarts
+  the FPGA, which then loads it.
+\end{description}
+
+We do not call these tools by hand. Every step directory contains the same
+\cc{Makefile} (it is a link to the one in \cc{01_logic_gates}), and its
+targets do it for us. The design is always in \cc{test.sv}, with the top
+module called \cc{test}.
+
+Next to this path to the chip there is a second one that does not need the
+board at all: \term{simulation}. The tool Verilator translates the design into
+a C++ class, and a small C++ program, the \term{testbench}, sets the inputs of
+this class step by step and records how all signals change. We look at these
+recordings in a waveform viewer. Chapter~\ref{ch:step01} shows both paths for
+our first design. Appendix~\ref{app:tools} lists all \cc{make} targets.
+
+\solutions
+
+\solution
+For $x_3 \wedge x_2$, the output is 1 exactly when $8x_3 + 4x_2 + 2x_1 + x_0
+\ge 12$, that is, for the indices 12, 13, 14, 15. So $t_{12} = t_{13} = t_{14}
+= t_{15} = 1$ and all other bits are 0. Written from $t_{15}$ down to $t_0$, as
+yosys does it (Section~\ref{sec:step01-yosys}):
+\cc{1111000000000000}.
+
+For $x_0 \xor x_1 \xor x_2 \xor x_3$, the output is 1 exactly when the
+index $i$ has an odd number of ones in binary: $i = 1, 2, 4, 7, 8, 11, 13, 14$.
+From $t_{15}$ down to $t_0$: \cc{0110100110010110}.

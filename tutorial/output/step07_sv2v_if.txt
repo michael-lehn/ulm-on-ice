@@ -1,0 +1,18 @@
+// removed module with interface ports: fifo
+// removed interface: if_fifo
+// removed package "pkg_ram"
+// removed ["import pkg_ram::RAM_BYTE_SIZE;"]
+// removed interface: if_io
+	// expanded interface instance: if_io
+	generate
+		if (1) begin : if_io
+			reg getc_pop;
+			reg putc_push;
+			// removed localparam type pkg_ram_data_size_t
+			wire [7:0] putc_char;
+			wire inbuf_full;
+			wire getc_en;
+			wire [7:0] getc_char;
+			reg putc_push_done;
+		end
+	endgenerate

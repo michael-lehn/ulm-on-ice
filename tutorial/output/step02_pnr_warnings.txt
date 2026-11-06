@@ -1,0 +1,4 @@
+Warning: net 'CLK' does not exist in design, ignoring clock constraint
+Warning: IO 'clock' is unconstrained in PCF and will be automatically placed
+Warning: IO 'Q2' is unconstrained in PCF and will be automatically placed
+Warning: IO 'Q1' is unconstrained in PCF and will be automatically placed

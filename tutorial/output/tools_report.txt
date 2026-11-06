@@ -1,0 +1,36 @@
+$ make report
+### PLACE AND ROUTE (for report) ###
+### SYNTHESIS PER MODULE (for report) ###
+Resource report for test in 09_ulm_on_ice
+
+== Device utilisation (nextpnr, iCE40 UP5K) ==
+   ICESTORM_LC = logic cell (4-input LUT + flip-flop)
+
+    ICESTORM_LC:      3036/   5280   57%
+    ICESTORM_RAM:       10/     30   33%
+    SB_IO:              16/     39   41%
+    SB_GB:               4/      8   50%
+    ICESTORM_DSP:        1/      8   12%
+    ICESTORM_SPRAM:      4/      4  100%
+
+Max frequency for clock 'CLK$SB_IO_IN_$glb_clk': 15.41 MHz (PASS at 12.00 MHz)
+
+== Cells per module (yosys) ==
+   first line: the whole design; below it: the cells of each submodule
+   itself, without its own submodules (indented under it)
+   cells = LUTs, flip-flops, carry cells, RAMs, ... (before packing into logic cells)
+   modules with interface ports are merged into their parent by sv2v
+
+     3707 test
+       65 uart_rx
+       58   baud_tick_gen
+       29 uart_tx
+       58   baud_tick_gen
+        1 dp_bram4096
+       47 dev_hex
+      129 quad_ext_high
+      129 quad_ext_low
+      209 quad_lshift
+      209 quad_rshift
+       53 quad_we_mask
+        2 spram

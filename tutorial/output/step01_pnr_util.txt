@@ -1,0 +1,3 @@
+Info: Device utilisation:
+Info:              ICESTORM_LC:       3/   5280     0%
+Info:                    SB_IO:       4/     39    10%

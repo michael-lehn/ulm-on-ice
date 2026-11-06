@@ -1,0 +1,12 @@
+== without_attribute.v ==
+       47 cells
+       27   SB_DFF
+       19   SB_LUT4
+        1   SB_RAM40_4K
+== dp_bram4096.v ==
+        1 cells
+        1   SB_RAM40_4K
+== async_read.v ==
+     8303 cells
+     4096   SB_DFFE
+     4207   SB_LUT4

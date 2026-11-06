@@ -1,0 +1,697 @@
+\chapter{Step 07: An I/O Device with Buffers}
+\label{ch:step07}
+
+In step 06 every character that arrived on the serial line was sent back at
+once, and then it was gone. A computer needs more: characters that arrive
+while the program is busy must wait somewhere until the program asks for them,
+and characters that the program writes must wait until the slow serial line
+can take them. So we build an I/O device with an input buffer and an output
+buffer. A buffer of this kind is a \term{FIFO}, a queue, and its content lives
+in a memory block of the FPGA. On the way we meet three new pieces of
+SystemVerilog: \cc{interface} and \cc{modport}, which bundle wires, and
+\cc{package}, which bundles declarations. Everything is in the directory
+\cc{07_io_interface}; the UART modules come from step 06
+(Chapter~\ref{ch:step06}), the display from step 03.
+
+\section{What the Design Does}
+\label{sec:step07-design}
+
+Figure~\ref{fig:step07-blocks} shows the parts. The module \cc{dev_io}
+contains the UART receiver and transmitter and two FIFOs. Every character
+that arrives on \cc{RX} goes two ways: into the input buffer, and into the
+output buffer, from where it is sent back on \cc{TX}, so that you see what you
+type. The other side of \cc{dev_io}, the one a computer would use, has two
+operations:
+\begin{description}
+\item[getc] reads the oldest character of the input buffer and removes it
+  (``pop'' it);
+\item[putc] appends a character to the output buffer (``push'' it).
+\end{description}
+In this step there is no computer yet. The top module \cc{test} plays its
+role with buttons: the display shows the oldest character in the input buffer
+as a hexadecimal number, \cc{BTN1} pops it, and \cc{BTN2} pushes the byte
+that is set at the inputs \cc{PMOD_1B} into the output buffer. \cc{LED1} is on
+while the input buffer is empty, \cc{LED2} when it is full, and \cc{LED3}
+while \cc{BTN1} is pressed although there is nothing to pop.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[node distance=6mm and 9mm]
+  \node[box,minimum width=17mm,minimum height=8mm] (rx) {\cc{uart_rx}};
+  \node[box,fill=green!10,right=12mm of rx,minimum width=22mm,minimum height=8mm,yshift=9mm] (in) {input buffer\\[-2pt]\footnotesize FIFO, 512 bytes};
+  \node[box,fill=green!10,right=12mm of rx,minimum width=22mm,minimum height=8mm,yshift=-9mm] (out) {output buffer\\[-2pt]\footnotesize FIFO, 512 bytes};
+  \node[box,left=12mm of out,minimum width=17mm,minimum height=8mm,yshift=-12mm] (tx) {\cc{uart_tx}};
+  \node[left=8mm of rx,note] (RX) {\cc{RX}};
+  \node[left=8mm of tx,note] (TX) {\cc{TX}};
+  \draw[arrow] (RX) -- (rx);
+  \draw[arrow] (rx.east) -- ++(4mm,0) |- (in.west);
+  \draw[arrow] (rx.east) -- ++(4mm,0) |- ([yshift=1.5mm]out.west);
+  \draw[arrow] ([yshift=-1.5mm]out.west) -- ++(-3mm,0) |- (tx.east);
+  \draw[arrow] (tx) -- (TX);
+  \node[draw,dashed,black!50,rounded corners,fit=(rx)(in)(out)(tx),inner sep=3mm,
+        label={[note]above:\cc{dev_io}}] (dev) {};
+  \node[right=16mm of in,note,align=left] (getc) {getc:\\\cc{getc_pop},
+    \cc{getc_en},\\\cc{getc_char}};
+  \node[right=16mm of out,note,align=left] (putc) {putc:\\\cc{putc_push},
+    \cc{putc_char}};
+  \draw[arrow] (in) -- (getc);
+  \draw[arrow] (putc) -- (out);
+\end{tikzpicture}
+\caption{The I/O device of step 07. The signals on the right are the side a
+computer will use; in this step, buttons and the display take its place.}
+\label{fig:step07-blocks}
+\end{figure}
+
+The new top module is short, because the work is done in \cc{dev_io}:
+
+\svpart{firstline=14,lastline=30}{07_io_interface/test.sv}
+
+Two things are new here: the line \cc{if_io if_io();} and the port
+connection \cc{.io(if_io.server)}. They are the subject of the next section.
+
+The ports of the display and of the input byte are vectors this time,
+\cc{PMOD_1A} and \cc{PMOD_1B}, each of 8 bits. The pin file gives every bit its
+own pin, with the index in brackets:
+\begin{terminal}
+set_io -nowarn PMOD_1A[0]   4
+set_io -nowarn PMOD_1A[1]   2
+...
+set_io -nowarn PMOD_1B[7]  28
+\end{terminal}
+These are the same pins as \cc{A0} to \cc{A7} and \cc{B0} to \cc{B7}: the
+display on PMOD 1A and the DIP switch on PMOD 1B, now addressed as two buses.
+
+\section{Interfaces: Named Bundles of Wires}
+\label{sec:step07-interface}
+
+Between \cc{test} and \cc{dev_io} there are seven signals: three go into
+\cc{dev_io}, four come out. We could list them as seven ports of \cc{dev_io}
+and connect them one by one, and in step 08 we would do the same again in
+the loader, and in step 09 in the processor. Instead we give the bundle a
+name:
+
+\svfile{07_io_interface/if_io.sv}
+
+(The first two lines import a constant from a package; we come to them in the
+next section. \cc{RAM_BYTE_SIZE} is 8.)
+
+\textbf{An \cc{interface} is a named bundle of wires.} Between
+\cc{interface if_io;} and \cc{endinterface} we declare signals, exactly as in
+a module. The line \cc{if_io if_io();} in \cc{test} creates one
+\term{instance} of the bundle, called \cc{if_io} as well: seven wires (or
+groups of wires, \cc{getc_char} has eight) that exist once in the circuit.
+Think of a ribbon cable with seven named strands. An interface contains no
+logic of its own here; it is wiring.
+
+\textbf{A \cc{modport} gives the direction of each wire, seen from one side.}
+A ribbon cable has two ends. At the end that plugs into \cc{dev_io},
+\cc{getc_pop} is an input and \cc{getc_char} an output; at the other end it is
+the other way round. The modport \cc{server} lists the directions as
+\cc{dev_io} sees them, the modport \cc{client} as the user of \cc{dev_io}
+sees them (Figure~\ref{fig:step07-interface}). A module that takes the bundle
+as a port names the modport:
+\begin{lstlisting}
+module dev_io #( ... ) (
+    ...
+    if_io.server io
+);
+\end{lstlisting}
+Inside \cc{dev_io}, the strands of the bundle are called \cc{io.getc_pop},
+\cc{io.getc_char}, and so on, and the modport tells the tools which of them
+\cc{dev_io} may drive. When we instantiate \cc{dev_io}, we plug the
+\cc{server} end of our bundle into this port with \cc{.io(if_io.server)}.
+The top module \cc{test} uses the signals of the bundle directly, as
+\cc{if_io.getc_pop} and so on; it takes the role of the client.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \node[box,minimum width=24mm,minimum height=44mm] (cl) at (0,0) {};
+  \node[note,anchor=north] at (cl.north) {client side\\(here: \cc{test})};
+  \node[box,minimum width=24mm,minimum height=44mm] (sv) at (88,0) {};
+  \node[note,anchor=north] at (sv.north) {server side\\(\cc{dev_io})};
+  \foreach \name/\y in {getc\_pop/9, putc\_push/4, putc\_char/-1} {
+    \draw[arrow] (12,\y) -- (76,\y);
+    \node[font=\scriptsize\ttfamily,fill=white,inner sep=1pt] at (44,\y) {\name};
+  }
+  \foreach \name/\y in {inbuf\_full/-6, getc\_en/-11, getc\_char/-16} {
+    \draw[arrow] (76,\y) -- (12,\y);
+    \node[font=\scriptsize\ttfamily,fill=white,inner sep=1pt] at (44,\y) {\name};
+  }
+  \draw[arrow] (76,-21) -- (12,-21);
+  \node[font=\scriptsize\ttfamily,fill=white,inner sep=1pt] at (44,-21) {putc\_push\_done};
+  \draw[decorate,decoration={brace,amplitude=3pt},thick,black!50] (18,12) -- (70,12)
+    node[midway,above=2pt,note] {interface instance \cc{if_io}: seven wires};
+  \node[note,anchor=north] at (0,-24) {\cc{modport client}:\\
+    first three \cc{output}, rest \cc{input}};
+  \node[note,anchor=north] at (88,-24) {\cc{modport server}:\\
+    first three \cc{input}, rest \cc{output}};
+\end{tikzpicture}
+\caption{The interface \cc{if_io} as a bundle of wires between two modules.
+The two modports describe the same wires, with the directions as seen from
+either end.}
+\label{fig:step07-interface}
+\end{figure}
+
+\textbf{What the tools make of it.} An interface is a convenience for us; in
+the circuit there are only wires. sv2v translates interfaces into plain
+Verilog by taking them apart. Here is an excerpt of \cc{test.v}:
+
+\outputfile{step07_sv2v_if.txt}
+
+The interface instance became a group of ordinary signals inside \cc{test}.
+And every module that has an interface port, here \cc{dev_io} and \cc{fifo},
+was removed as a module: sv2v copied its contents into the module that
+instantiates it, with the interface signals connected directly. The circuit is
+the same, but the hierarchy is gone. This is why \cc{make report} cannot list
+\cc{dev_io} and \cc{fifo} separately (Section~\ref{sec:step07-resources}); the
+report says so in its header.
+
+\section{Packages and Include Files}
+\label{sec:step07-package}
+
+Several modules need the same constants, for example the width of a byte or,
+from step 08 on, the number of address bits of the memory. We collect them in
+a \term{package}:
+
+\svfile{07_io_interface/pkg_ram.sv}
+
+\textbf{A package is a named collection of declarations.} It describes no
+hardware, it only gives names to types and constants. Inside it, the names are
+declared with \cc{typedef enum}, which we know from step 06: there it named the
+states of a state machine. Here the enumerations are used with explicit values
+as a list of named integer constants: \cc{RAM_BYTE_SIZE} is 8,
+\cc{RAM_QUAD_SIZE} is 64, \cc{RAM_ADDRW} is 17, and so on. The enumeration
+\cc{data_type_t} and \cc{op_t} will be real types in step 08.
+
+There are two ways to use a name from a package. The full name
+\cc{pkg_ram::RAM_BYTE_SIZE} works everywhere. Or we \term{import} it once,
+\cc{import pkg_ram::RAM_BYTE_SIZE;}, and then write just
+\cc{RAM_BYTE_SIZE}. In \cc{if_io.sv} the import stands outside any module or
+interface; for the tools we use, it then applies to everything that follows in
+the same run.
+
+\textbf{\cc{`include} copies text.} A package must be known before it is used.
+The Makefile passes all \cc{*.sv} files to sv2v and Verilator in alphabetical
+order, so \cc{if_io.sv} comes before \cc{pkg_ram.sv}. Therefore \cc{if_io.sv}
+starts with \cc{`include "pkg_ram.sv"}. Like \texttt{\#include} in C, this is done
+by a preprocessor before anything else: the line is replaced by the contents of
+the file. Now the package is defined before \cc{if_io} uses it.
+
+But it would be defined twice: once through the include, and once more when
+the tools reach \cc{pkg_ram.sv} in the file list (and in step 08 many files
+include it). A second definition of the same package is an error. The first
+and the last two lines of \cc{pkg_ram.sv} prevent this; they are an
+\term{include guard}. \cc{`ifndef PKG_RAM} means ``only if the macro
+\cc{PKG_RAM} is not defined, keep the text up to \cc{`endif}''. The first copy
+defines \cc{PKG_RAM}, so every later copy is dropped by the preprocessor. Just
+as with interfaces, sv2v resolves all of this; \cc{test.v} contains no package
+at all, only the constants substituted where they are used.
+
+\section{A FIFO}
+\label{sec:step07-fifo}
+
+A FIFO (first in, first out) is a queue: we \term{push} elements at the back
+and \term{pop} them at the front, and they come out in the order in which they
+went in. In hardware we build it from a memory with $N$ entries and two
+registers, the \term{read pointer} $r$ and the \term{write pointer} $w$. Push
+stores the new element at address $w$ and increments $w$; pop takes the
+element at address $r$ and increments $r$. When a pointer reaches the end of
+the memory it starts again at address 0, so the memory is used as a ring
+(Figure~\ref{fig:step07-ring}).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+  \foreach \i in {0,...,7} {
+    \pgfmathsetmacro{\a}{90-45*\i}
+    \pgfmathsetmacro{\b}{90-45*(\i+1)}
+    \ifnum\i>1 \ifnum\i<6
+      \fill[green!15] (\a:1.1) arc (\a:\b:1.1) -- (\b:2.0) arc (\b:\a:2.0) -- cycle;
+    \fi\fi
+    \draw (\a:1.1) -- (\a:2.0);
+    \pgfmathsetmacro{\m}{90-45*\i-22.5}
+    \node[font=\scriptsize] at (\m:1.55) {\i};
+  }
+  \draw (0,0) circle (1.1); \draw (0,0) circle (2.0);
+  \draw[arrow] (67.5-90-45:3.0) -- (67.5-90-45:2.1)
+     node[pos=0,below right=-1mm,note] {read pointer $r=2$};
+  \draw[arrow] (67.5-270:3.0) -- (67.5-270:2.1)
+     node[pos=0,above left=-1mm,note] {write pointer $w=6$};
+  \node[note] at (0,0) {$N=8$};
+\end{tikzpicture}
+\caption{A FIFO with $N=8$ entries as a ring. Entries 2 to 5 (shaded) hold
+the queue; the next pop reads entry 2, the next push writes entry 6.}
+\label{fig:step07-ring}
+\end{figure}
+
+\subsection*{Counting with pointers, modulo something}
+
+How many elements are in the queue? If neither pointer had wrapped around, it
+would be $w - r$. With wrapping, the pointers are numbers modulo $N$, and the
+count is $(w - r) \bmod N$. Here is the catch: the count can be anything from
+0 to $N$, which are $N+1$ values, but $(w - r) \bmod N$ has only $N$. An
+empty FIFO has $w = r$; but after $N$ pushes into an empty FIFO, $w$ has gone
+once around the ring, and again $w = r$. With pointers modulo $N$ we cannot
+tell empty from full.
+
+The usual solution, and the one used here, is to give each pointer one bit
+more than the address needs. With $N = 2^k$ entries, an address has $k$ bits,
+and the pointers have $k+1$ bits, so they count modulo $2N$. The memory
+address is the pointer modulo $N$, which is simply its lower $k$ bits. The
+number of elements is
+\[
+  n = (w - r) \bmod 2N ,
+\]
+and as long as $0 \le n \le N$ (we never push into a full FIFO and never pop
+from an empty one), this is the true count: empty and full are now different
+values of $w - r$. In terms of the bits:
+\begin{itemize}
+\item empty, $n = 0$: $w = r$, all $k+1$ bits equal;
+\item full, $n = N$: $w - r \equiv N \pmod{2N}$, that is, the lower $k$ bits
+  are equal (same address) and the top bits differ (one pointer is a lap
+  ahead).
+\end{itemize}
+
+Our FIFO has $N = 512$ entries of one byte, so $k = 9$ and the pointers have
+10 bits. An example: $r = 1000$ and $w = 6$ means $n = (6 - 1000) \bmod 1024
+= 30$. The read pointer is at address $1000 \bmod 512 = 488$, the write
+pointer at address 6: the queue occupies addresses 488 to 511 and 0 to 5.
+
+\subsection*{The FIFO in SystemVerilog}
+
+The FIFO has its own interface:
+
+\svfile{07_io_interface/if_fifo.sv}
+
+Like a module (Chapter~\ref{ch:step06}), an interface can have a parameter
+list; here it fixes \cc{WIDTH = 8}. The FIFO itself:
+
+\svfile{07_io_interface/fifo.sv}
+
+The parameters compute the sizes: one memory block of $4096$ bits, entries
+of $8$ bits, so $\mathtt{DEPTH} = 512$ entries and $\mathtt{ADDRW} =
+\lceil \log_2 512 \rceil = 9$ address bits. \cc{$clog2} is evaluated by the
+tools, not by the circuit: it computes a constant. All four are
+\cc{localparam}s, which cannot be changed from outside: the FIFO always fills
+exactly one memory block, and \cc{dp_bram4096} below computes the same depth
+from the same width. The pointers are declared
+as \cc{logic [ADDRW:0]}, that is with $\mathtt{ADDRW}+1 = 10$ bits, exactly as
+in our analysis.
+
+The \cc{always_ff} block describes the two pointer registers and their
+next-state logic: each is a counter (register plus adder) whose increment is
+enabled by \cc{push_back} or \cc{pop_front}. The \cc{case} over the
+concatenation \cc{{fifo.push_back, fifo.pop_front}} lists all four
+combinations; with both, both pointers advance and the count stays the same.
+Wrapping around costs nothing: a 10-bit counter computes modulo $2^{10}$ by
+itself, because the carry out of the top bit is dropped.
+
+The \cc{always_comb} block computes \cc{full} and \cc{empty} with the
+comparisons from above. \cc{read_ptr[ADDRW]} is the top bit, \cc{[ADDRW-1:0]}
+the address bits.
+
+Finally, the memory \cc{dp_bram4096} is instantiated with the write pointer's
+address bits as write address and the read pointer's as read address. Its
+write enable is \cc{push_back} itself: at the clock edge at which the pointer
+advances, the byte is written into the memory.
+
+The comment at the top states the rules for using the FIFO. The important one
+for us: \cc{data_out} is the memory's output, and this output, as we see in a
+moment, is a register that is loaded at every clock edge from the address that
+the read pointer had \emph{before} the edge. So after a pointer changes, it
+takes one more clock cycle until \cc{data_out} shows the new front element.
+
+\section{Memory: Block RAM}
+\label{sec:step07-bram}
+
+A FIFO of 512 bytes needs $4096$ bits of storage. As flip-flops, that would
+be $4096$ of our $5280$ logic cells, and the multiplexer that selects one of
+512 bytes would need a few thousand LUTs more. This is what the memory blocks
+mentioned in Section~\ref{sec:fpga} are for. The iCE40UP5K has 30
+\term{block RAMs} (also called EBR, embedded block RAM) of $4$\,kbit each,
+called \cc{SB_RAM40_4K} in the netlist. Each one can be configured as
+$256 \times 16$, $512 \times 8$, $1024 \times 4$ or $2048 \times 2$ bits, and
+it has two ports: one for writing and one for reading, each with its own
+address, both working at the clock edge.
+
+We do not instantiate \cc{SB_RAM40_4K} ourselves. Instead we describe a memory
+in a way that matches what the block can do, and yosys recognises it:
+
+\svfile{07_io_interface/dp_bram4096.sv}
+
+\textbf{An array of vectors is a memory.} \cc{logic [WIDTH-1:0] mem [DEPTH];}
+declares \cc{DEPTH} = 512 elements \cc{mem[0]} to \cc{mem[511]}, each a vector
+of 8 bits. The dimension after the name, \cc{[DEPTH]}, is short for
+\cc{[0:DEPTH-1]}. \cc{mem[addr_in]} selects an element by an address that is
+a signal, so this is a memory with an address decoder, not a fixed wire.
+
+\textbf{The pattern that becomes a block RAM.} In the \cc{always} block,
+\begin{itemize}
+\item one element is written at the clock edge, at one address, if an enable
+  is 1: this is the write port;
+\item \cc{data_out} is a register that takes, at the clock edge, the element at
+  another address: this is the read port. The read is \emph{synchronous}: the
+  data appears after the clock edge, not combinationally.
+\end{itemize}
+This is exactly the behaviour of \cc{SB_RAM40_4K}, whose read port has an
+output register. (The block uses plain \cc{always} where we would write
+\cc{always_ff}; it describes the same flip-flops.) yosys reports in
+\cc{test.log} what it found:
+
+\outputfile{step07_memlibmap.txt}
+
+Both FIFO memories became block RAMs (\cc{$__ICE40_RAM4K_} is yosys's name for
+\cc{SB_RAM40_4K} at this stage). The ROM of 16 entries that \cc{dev_hex}
+contains, the table of digit patterns, is so small that yosys builds it from
+logic cells instead. The statistics at the end of the log:
+
+\outputfile{step07_yosys_stat.txt}
+
+Two \cc{SB_RAM40_4K} for the two FIFOs. (The \cc{$scopeinfo} entries are not
+hardware; yosys keeps them to remember the names of the parts of the design
+after flattening. The flip-flops come in variants: \cc{E} has an enable
+input, \cc{SR} and \cc{SS} a synchronous reset or set input. All of them are
+the flip-flop of a logic cell.)
+
+\textbf{Reading and writing the same address.} What should \cc{data_out} be
+if, at one clock edge, we write address 5 and read address 5? With \cc{<=},
+all right-hand sides are taken from before the edge (Chapter~\ref{ch:step02}),
+so the description says: the old content (\term{read-first}). The block RAM
+does not guarantee this; for such a collision its output is undefined. Left
+to itself, yosys therefore adds logic around the block that detects a
+collision and delivers the old value. The line before the declaration of
+\cc{mem},
+\begin{lstlisting}
+(* no_rw_check *)
+\end{lstlisting}
+tells it not to. Text between \cc{(*} and \cc{*)} is an \term{attribute}: a
+note for the tools, attached to the declaration that follows. It describes no
+hardware itself; \cc{no_rw_check} promises yosys that we never rely on the
+value read in a collision, so it may use the block RAM as it is. sv2v copies
+attributes into \cc{test.v}. Whether the promise holds for our FIFOs is
+Exercise~\ref{ex:step07-rwcheck}.
+
+How much depends on the pattern? We synthesised \cc{dp_bram4096} alone, as
+sv2v translates it, and in two modified versions: one without the attribute,
+and one where the read is combinational, \cc{assign data_out = mem[addr_out];}:
+
+\outputfile{step07_bram_variants.txt}
+
+Without the attribute, 27 flip-flops and 19 LUTs appear next to the block
+RAM: the collision logic (yosys's log calls it ``emulate read-first
+behavior''), once per FIFO. The last version shows what happens if we leave
+the pattern: the block RAM cannot read combinationally, so yosys builds the
+memory from 4096 flip-flops and the read multiplexer from 4207 LUTs, more
+than the whole chip has.
+
+\begin{pitfall}
+Synthesis directives are specific to a tool. An earlier version of
+\cc{dp_bram4096.sv} had the comment
+\cc{/* synthesis syn_ramstyle = "no_rw_check" */} after the declaration of
+\cc{mem}. That is the syntax of another vendor's synthesis tool; yosys
+ignores comments (and sv2v drops them), so the design silently carried the
+46 extra cells per FIFO. If a directive matters, check in the statistics that
+it has an effect.
+\end{pitfall}
+
+\textbf{Initial contents.} The \cc{initial} block sets \cc{mem[0]} to 255.
+For a block RAM this is possible: its initial contents are part of the
+bitstream, and all other entries start as 0. In our design this has a visible
+effect: before the first character arrives, the read pointer is 0, the output
+register shows \cc{mem[0]}, and the display shows \cc{FF}.
+
+\section{The I/O Device}
+\label{sec:step07-devio}
+
+Now we can read \cc{dev_io}. It instantiates two interfaces of type
+\cc{if_fifo} and two FIFOs, each connected through the modport \cc{fifo}:
+\begin{lstlisting}
+if_fifo inbuf(), outbuf();
+
+fifo input_buffer(
+    .clk(clk),
+    .rst(rst),
+    .fifo(inbuf.fifo)
+);
+\end{lstlisting}
+Note that \cc{dev_io} has no wires of its own for the FIFO signals: \cc{inbuf}
+\emph{is} the bundle of wires between \cc{dev_io} and the input buffer, and
+\cc{dev_io} drives \cc{inbuf.push_back} and reads \cc{inbuf.data_out}.
+
+\subsection*{From the receiver into the buffers}
+
+\svpart{firstline=65,lastline=100}{07_io_interface/dev_io.sv}
+
+The receiver from step 06 reports a byte by setting \cc{rx_ready} for one
+clock cycle. The first block stores the byte in the register \cc{rx_data_buf}.
+The second block remembers in the flip-flop \cc{rx_inbuf_push} that this byte
+still has to go into the input buffer, and pushes it when the FIFO is not full
+and has not been pushed in the previous cycle (rule (1) in the comment of
+\cc{fifo.sv}). \cc{inbuf.push_back} is a register that is 1 for exactly one
+cycle per byte. A third block of the same structure (lines 103--125) pushes
+into the output buffer; besides the received bytes it accepts the bytes of
+\cc{putc}, and it acknowledges them with \cc{putc_push_done}.
+
+\begin{exercise}
+\label{ex:step07-pointers}
+In the input buffer, the read pointer is $r = 700$ and the write pointer is
+$w = 188$ (both in decimal). How many characters are waiting? Is the buffer
+full? At which memory addresses are the characters? What would happen if
+\cc{dev_io} pushed 512 more characters without looking at \cc{full}?
+\end{exercise}
+
+\subsection*{When is a character available?}
+
+\svpart{firstline=42,lastline=59}{07_io_interface/dev_io.sv}
+
+Why not simply \cc{getc_en = !inbuf.empty}? Figure~\ref{fig:step07-timing}
+shows the reason; it is taken from the simulation of this step, where a
+character \cc{'Z'} (\cc{0x5a}) arrives. At the edge at time 14, the byte is
+written into the memory and the write pointer advances, so \cc{empty} becomes
+0. At the same edge, the output register of the memory loads the entry at the
+read pointer, and since the write happens at the same edge, it gets the old
+content, \cc{0xff}. Only at the next edge (time 16) does \cc{data_out} show
+\cc{0x5a}. The register \cc{inbuf_empty_r} is \cc{empty} delayed by one
+cycle, and \cc{getc_en} waits for both: it becomes 1 exactly when
+\cc{getc_char} is valid.
+
+The same delay occurs after a pop. In the clock cycle in which \cc{getc_pop}
+is 1, \cc{getc_char} is the front character, and the pop takes effect at the
+end of this cycle. In the cycle after it, the read pointer has moved, but the
+memory output still shows the character just popped; only one edge later does
+it show the next one. The register \cc{getc_pop_r}, \cc{getc_pop} delayed by
+one cycle, covers this cycle: \cc{getc_en} is 0 in it, even if more
+characters are waiting. So a user of \cc{dev_io} may rely on one simple rule:
+whenever \cc{getc_en} is 1, \cc{getc_char} is the front character and a pop
+is allowed. It takes the character in the cycle in which it pops (as the
+comment in \cc{fifo.sv} says).
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=6.2mm,y=6.5mm]
+  \foreach \name/\y in {CLK/8, rx\_ready/7, rx\_inbuf\_push/6, push\_back/5,
+      write\_ptr/4, empty/3, data\_out/2, inbuf\_empty\_r/1, getc\_en/0} {
+    \node[anchor=east,font=\small\ttfamily] at (5.7,\y+0.25) {\name};
+    \draw[black!8,line width=3mm] (6,\y+0.25) -- (21,\y+0.25);
+  }
+  % clock: high at even times, rising edges at even times
+  \draw[clocksig] (6,8.5) \foreach \t in {6,8,...,18} { -- (\t+1,8.5) -- (\t+1,8) -- (\t+2,8) -- (\t+2,8.5) } -- (21,8.5);
+  \draw[signal] (6,7) -- (8,7) -- (8,7.5) -- (10,7.5) -- (10,7) -- (21,7);
+  \draw[signal] (6,6) -- (10,6) -- (10,6.5) -- (12,6.5) -- (12,6) -- (21,6);
+  \draw[signal] (6,5) -- (12,5) -- (12,5.5) -- (14,5.5) -- (14,5) -- (21,5);
+  % write_ptr bus
+  \draw[signal] (6,4) -- (13.8,4) -- (14.2,4.5) -- (21,4.5);
+  \draw[signal] (6,4.5) -- (13.8,4.5) -- (14.2,4) -- (21,4);
+  \node[font=\scriptsize] at (10,4.25) {0}; \node[font=\scriptsize] at (17.5,4.25) {1};
+  \draw[signal] (6,3.5) -- (14,3.5) -- (14,3) -- (21,3);
+  % data_out bus
+  \draw[signal] (6,2) -- (15.8,2) -- (16.2,2.5) -- (21,2.5);
+  \draw[signal] (6,2.5) -- (15.8,2.5) -- (16.2,2) -- (21,2);
+  \node[font=\scriptsize] at (11,2.25) {ff}; \node[font=\scriptsize] at (18.5,2.25) {5a};
+  \draw[signal] (6,1.5) -- (16,1.5) -- (16,1) -- (21,1);
+  \draw[signal,draw=green!45!black] (6,0) -- (16,0) -- (16,0.5) -- (21,0.5);
+  \foreach \t in {8,10,...,20} {
+    \draw[black!12] (\t,-0.4) -- (\t,8.8);
+    \node[below,font=\scriptsize] at (\t,-0.4) {\t};
+  }
+  \node[note,anchor=west] at (21.2,-0.7) {\cc{sim_time}};
+\end{tikzpicture}
+\caption{A character arrives in the input buffer (simulation of step 07; the
+gray lines are rising clock edges). \cc{empty} becomes 0 one cycle before the
+memory output shows the new character; \cc{getc_en} waits for it.}
+\label{fig:step07-timing}
+\end{figure}
+
+\begin{pitfall}
+A signal that says ``the data is valid'' must account for every reason why
+the data can be stale. An earlier version of \cc{dev_io} had only
+\cc{inbuf_empty_r}, so \cc{getc_en} was 1 in the cycle after a pop while
+\cc{getc_char} still showed the popped character. On the board nobody
+noticed: at 9600 baud a character takes more than 12\,000 clock cycles, and
+the user had taken each one long before the next arrived. In a simulation in
+which characters arrive every two clock cycles, the loader of
+Chapter~\ref{ch:step08} read characters twice and skipped others.
+\end{pitfall}
+
+\subsection*{From the output buffer to the transmitter}
+
+\svpart{firstline=143,lastline=159}{07_io_interface/dev_io.sv}
+
+When the transmitter is idle and the output buffer is not empty, the block
+sets \cc{pop_front} for one cycle. In this cycle \cc{data_out} is the front
+byte, and at its end the byte is copied to \cc{tx_data_in} and \cc{tx_start} is
+set: the transmitter from step 06 starts sending. Here, too, the byte is
+taken in the cycle of the pop.
+
+\subsection*{The top module}
+
+\svpart{firstline=49,lastline=72}{07_io_interface/test.sv}
+
+A button bounces (Chapter~\ref{ch:step02}): for a few milliseconds after it is
+pressed or released, the contacts open and close several times. Each pop must
+remove exactly one character, so \cc{test} does not look at \cc{BTN1}
+directly. The module \cc{debounce} turns every press into a pulse
+\cc{btn1_press} that is 1 for exactly one clock cycle, and in that cycle
+\cc{getc_pop} is set to \cc{getc_en}: we pop only if there is something to
+pop. Pushing with \cc{BTN2} works the same way, with a second instance of
+\cc{debounce}. The \cc{initial} block sets the power-up value of the
+flip-flop \cc{getc_pop}, which lives in the interface.
+
+\svfile{07_io_interface/debounce.sv}
+
+The debouncer is the one suggested in Chapter~\ref{ch:step04}, in three
+parts:
+\begin{itemize}
+\item a \term{synchroniser} of two flip-flops, \cc{btn_s1} and \cc{btn_s2},
+  because the button changes without regard to the clock;
+\item the debounced \cc{level}, a flip-flop that follows \cc{btn_s2} only
+  slowly. The counter \cc{cnt} counts the cycles in which \cc{btn_s2} differs
+  from \cc{level}, and is cleared in every cycle in which they agree. Only if
+  they differ in $2^W = 2^{17} = 131\,072$ cycles in a row, about 11\,ms at
+  12\,MHz, does \cc{level} take the new value. A bounce shorter than that
+  clears the counter again and has no effect. \cc{&cnt} is a \term{reduction}:
+  the AND of all bits of \cc{cnt}, so it is 1 exactly when \cc{cnt} is
+  $2^W - 1$, all ones.
+\item an edge detector, \cc{level_r} one cycle behind \cc{level}, so
+  \cc{press} is 1 in the first cycle in which \cc{level} is 1.
+\end{itemize}
+The price is a delay of 11\,ms between pressing the button and the pop, which
+nobody notices, and about 60 cells per button
+(Section~\ref{sec:step07-resources}).
+
+\begin{exercise}
+\label{ex:step07-bounce}
+In \cc{test.sv}, instantiate both debouncers with \texttt{debounce \#(.W(2))}, so
+that a level counts after four stable cycles. The testbench of the next
+section presses each button once, but lets it bounce: four short pulses of
+300 cycles before it stays pressed, and three short interruptions when it is
+released. Predict what the testbench prints, and check with \cc{make sim}.
+\end{exercise}
+
+\section{Simulation}
+\label{sec:step07-sim}
+
+At 9600 baud a single bit lasts $12\,000\,000 / 9600 = 1250$ clock cycles, and
+a character more than ten times as long. A simulation that sends real
+characters through \cc{uart_rx} would mostly show waiting. The testbench
+therefore bypasses the receiver and sets its outputs directly. It drives the
+clock in a function \cc{tick}, one cycle per call, and at three rising edges
+it delivers the characters \cc{'Z'}, \cc{'1'} and \cc{'2'}:
+
+\cpppart{firstline=63,lastline=86}{07_io_interface/tb_test.cpp}
+
+\cc{dut->test->io0->uart_rx0->rx_ready} is the signal \cc{rx_ready} inside
+the instance \cc{uart_rx0} inside \cc{io0} inside \cc{test}. Verilator makes
+such internal signals accessible from C++ only if they are marked with the
+comment \cc{/* verilator public */}, which is why the copies of the UART
+modules in this directory differ from those of step 06 in exactly this point.
+In the same way, \cc{test.sv} marks \cc{hex_val}, the front character that the
+display shows, so that the testbench can read it.
+
+The rest of the testbench plays the user. It presses \cc{BTN1} once to pop
+\cc{'Z'}, and then \cc{BTN2} once to push the byte \cc{0x41}, \cc{'A'}, set
+at \cc{PMOD_1B}. To test the debouncers, each press bounces:
+
+\cpppart{firstline=101,lastline=122}{07_io_interface/tb_test.cpp}
+
+\cc{HOLD} is 140\,000 cycles, a little more than the $2^{17}$ that the
+debouncer waits. Meanwhile, a small decoder in \cc{tick} samples \cc{TX} in
+the middle of each bit and collects the bytes that the transmitter sends: the
+echo of the three received characters, and the pushed \cc{'A'}. At the end the
+testbench prints what it saw and compares it with what it expects:
+
+\outputfile{step07_sim.txt}
+
+One press, one pop, one push. The whole run is about 600\,000 clock cycles;
+only the first 100 go into \cc{waveform.vcd}, which keeps the file small.
+Figure~\ref{fig:step07-timing} is the beginning of it.
+
+\section{Resources}
+\label{sec:step07-resources}
+
+\outputfile{step07_report.txt}
+
+The design fits easily: 285 logic cells and 2 of the 30 block RAMs. The list
+of modules shows the effect of sv2v from
+Section~\ref{sec:step07-interface}: \cc{dev_io} and both FIFOs have interface
+ports and were merged into \cc{test}, so their cells are counted there. The
+two memories appear once as \cc{dp_bram4096}, with the single block RAM cell
+we saw above, and the two debouncers once as \cc{debounce} with 62 cells (the
+list shows each module once, not once per instance).
+
+\begin{exercise}
+\label{ex:step07-rwcheck}
+The attribute \cc{(* no_rw_check *)} promises yosys that a read and a write
+of the same address at the same edge never matter. Argue that the promise
+holds for the I/O device: when can a write and a read of the same address
+happen at the same edge, and is \cc{data_out} used in the following cycle?
+Then delete the attribute and check with \cc{make report} what it saves.
+\end{exercise}
+
+\section{What Is Next}
+
+We have a device that buffers input and output, and a defined way to read and
+write characters through \cc{if_io}. What is missing for a computer is memory
+for the program and its data: 512 bytes of block RAM would not get us far. The
+next step uses the much larger memory blocks of the iCE40UP5K and writes a
+program into them, typed in as hexadecimal digits through \cc{dev_io}.
+
+\solutions
+
+\solution
+$n = (188 - 700) \bmod 1024 = 512$, so 512 characters are waiting and the
+buffer is full: the address bits are equal ($700 \bmod 512 = 188$) and the
+top bits differ ($700 \ge 512$, $188 < 512$). The characters occupy all
+addresses, starting at the front at address 188, up to 511, then 0 to 187.
+Pushing into a full buffer is forbidden by the rules of the FIFO, and
+\cc{dev_io} checks \cc{full} before every push. If 512 pushes happened anyway,
+they would overwrite all waiting characters, and $w$ would become
+$188 + 512 = 700 = r$: the FIFO would report \cc{empty}, although 512
+characters were pushed since the last pop.
+
+\solution
+With $W = 2$, a level counts after $2^2 = 4$ stable cycles. The bounces last
+200 and 300 cycles, far more than four, so each of them is a separate press
+for the debouncer: four presses before the button stays down, the real one,
+and three more at the release, eight rising edges of \cc{level} per button.
+The eight pops of \cc{BTN1} remove all three characters (pops on an empty
+buffer are suppressed by \cc{getc_en}), and the display shows \cc{00}, the
+never-written entry 3 of the memory. The eight pushes of \cc{BTN2} send eight
+\cc{'A'}:
+
+\outputfile{step07_sim_w2.txt}
+
+The debouncer must wait longer than the contacts bounce; with $W = 17$ it
+waits about 11\,ms.
+
+\solution
+A write to the address at the read pointer happens only when the FIFO is empty
+(otherwise the write pointer is ahead of the read pointer, and when it is a
+whole lap ahead, the FIFO is full and no push is allowed). After this edge,
+\cc{data_out} may be wrong for one cycle. For the input buffer, \cc{getc_en}
+stays 0 in this cycle because \cc{inbuf_empty_r} is still 1. For the output
+buffer, the pop is decided at the end of this cycle and happens in the next,
+when \cc{data_out} has been loaded again. So the device works without the
+extra logic. Without the attribute, \cc{make report} shows 47 cells for
+\cc{dp_bram4096} instead of 1: the attribute saves 46 cells per FIFO.

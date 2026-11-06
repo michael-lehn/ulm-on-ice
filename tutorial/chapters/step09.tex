@@ -1,0 +1,736 @@
+\chapter{Step 09: The ULM on ICE}
+\label{ch:step09}
+
+% A register of the ULM, e.g. \reg{1} gives %1.
+\newcommand{\reg}[1]{\texttt{\%#1}}
+
+This is the last step: the ULM itself. Almost all of its parts are already
+there. Chapter~\ref{ch:step05} built a small ALU with a register file and a
+decoder, Chapter~\ref{ch:step07} the serial I/O with its FIFOs,
+Chapter~\ref{ch:step08} the RAM and the loader that fills it with a program
+typed into a terminal. What is new is the part that makes these parts a
+computer: a \term{control unit} that fetches an instruction from the RAM,
+decodes it, and lets the ALU, the register file, the RAM or the I/O execute
+it, over and over again. Everything is in \cc{09_ulm_on_ice}; the files that
+are links to earlier steps are unchanged.
+
+\section{The Instruction Set}
+\label{sec:step09-isa}
+
+Every ULM instruction is a 32-bit word. Its top byte, bits 31 to 24, is the
+\term{opcode}; it says what to do. The other 24 bits are split into fields,
+and how they are split depends on the instruction. The file
+\cc{examples/isa.txt} lists these splits as \term{formats}:
+
+\begin{center}
+\small
+\begin{tabular}{lcccc@{\quad}l}
+\toprule
+format & 31--24 & 23--20 & 19--16 & 15--0 & used by \\
+\midrule
+\texttt{U8}      & OP & \multicolumn{2}{c}{\textit{imm} (8 bits)} & & \texttt{halt 0x42}, \texttt{putc 'a'} \\
+\texttt{R}       & OP & $x$ & & & \texttt{putc \%x}, \texttt{getc \%x} \\
+\texttt{RR}      & OP & $y$ & $x$ & & \texttt{jmp \%y, \%x} \\
+\texttt{REL\_JMP} & OP & \multicolumn{3}{c}{\textit{offset} (24 bits, signed)} & \texttt{jz}, \texttt{jmp}, \dots \\
+\texttt{U20\_R}  & OP & \textit{dest} & \multicolumn{2}{c}{\textit{imm} (20 bits)} & \texttt{loadz imm, \%dest} \\
+\texttt{R\_R\_R} & OP & $z$ & $y$ & $x$ (15--12) & \texttt{addq \%x, \%y, \%z} \\
+\texttt{U16\_R\_R} & OP & $z$ & $y$ & \textit{imm} & \texttt{addq imm, \%y, \%z} \\
+\texttt{MR\_R}, \texttt{R\_MR} & OP & \textit{data} & \textit{addr} & \textit{offset} (signed) & \texttt{movq 8(\%addr), \%data} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Register numbers are 4 bits wide, for the 16 registers \reg{0} to \reg{15}.
+\reg{0} is special: it always reads as 0, and writing it has no effect. The
+instructions that the hardware understands are these (``imm'' is a constant
+from the instruction, $u$ and $s$ mean that it is read as an unsigned or a
+signed number):
+
+\begin{center}
+\small
+\begin{tabular}{@{}l@{\quad}l@{\quad}l@{}}
+\toprule
+opcode & instruction & effect \\
+\midrule
+\texttt{01}, \texttt{02} & \texttt{halt imm}, \texttt{halt \%x} & stop, with an exit code \\
+\texttt{05} & \texttt{jmp offset} & $\mathit{ip} \gets \mathit{ip} + 4\cdot\mathit{offset}$ \\
+\texttt{03}, \texttt{04}, \texttt{06} & \texttt{jnz}, \texttt{jz}, \texttt{jb} & the same, if ZF $=0$, ZF $=1$, CF $=1$ \\
+\texttt{08}--\texttt{0D} & \texttt{jbe}, \texttt{ja}, \texttt{jae}, \texttt{jge}, \texttt{jnge}, \texttt{jng} & conditional jumps on other flag combinations\\
+\texttt{07} & \texttt{jmp \%y, \%x} & $\%x \gets \mathit{ip}+4$, $\mathit{ip} \gets \%y$ (\texttt{call}, \texttt{ret}) \\
+\texttt{10}, \texttt{11} & \texttt{loadz imm, \%dest}, \texttt{loads} & $\%\mathit{dest} \gets u(\mathit{imm})$, resp.\ $s(\mathit{imm})$ \\
+\texttt{12}, \texttt{13} & \texttt{addq imm, \%y, \%z}, \texttt{addq \%x, \%y, \%z} & $\%z \gets \%y + \mathit{imm}$, resp.\ $\%y + \%x$ \\
+\texttt{14}, \texttt{15} & \texttt{subq} (same two forms) & $\%z \gets \%y - \mathit{imm}$, resp.\ $\%y - \%x$ \\
+\texttt{16}, \texttt{17} & \texttt{mulw} (same two forms) & product of the lowest 16 bits \\
+\texttt{18}--\texttt{1D} & \texttt{andq}, \texttt{shrq}, \texttt{shlq} (both forms) & bitwise and, shift right, shift left \\
+\texttt{20}, \texttt{21} & \texttt{movzbq offset(\%addr), \%data}, \texttt{movsbq} & load one byte, zero- resp.\ sign-extended \\
+\texttt{22} & \texttt{movb \%data, offset(\%addr)} & store one byte \\
+\texttt{23}, \texttt{24} & \texttt{movq} (load and store) & the same for 8 bytes \\
+\texttt{30}, \texttt{31} & \texttt{putc \%x}, \texttt{putc imm} & send a character \\
+\texttt{32} & \texttt{getc \%x} & wait for a character, $\%x \gets$ its code \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All arithmetic is modulo $2^{64}$. The flags are set by the last ALU
+instruction: ZF if its result was 0, SF to its bit 63, CF if an addition had a
+carry or a subtraction a borrow, OF if it overflowed as a signed operation (the
+other ALU instructions clear CF and OF), so \texttt{subq \%x, \%y, \%0} followed by \texttt{jb}
+jumps if $u(\%y) < u(\%x)$. Since a jump offset counts instructions, not
+bytes, the hardware multiplies it by 4.
+
+The file \cc{examples/isa.txt} describes exactly these instructions, in the
+input format of the \cc{ulm-generator}: first the formats, then for each
+opcode its format, its assembler notation, and its effect as a few lines of C.
+From this file the \cc{ulm-generator} builds an assembler (\cc{ulmas}), which
+translates the \cc{.s} files of \cc{examples} into machine code (the files
+without extension contain the same bytes as hex digits), and a simulator of
+the ULM in software (\cc{ulm}), in which a program can be tried out before it
+goes to the board.
+
+\section{The Architecture}
+\label{sec:step09-arch}
+
+Figure~\ref{fig:step09-blocks} shows how \cc{test.sv} connects the parts. The
+I/O device \cc{dev_io} and the RAM \cc{dev_ram} have two possible users: the
+loader of Chapter~\ref{ch:step08} and the new control unit \cc{dev_cu}. The
+switches \cc{dev_io_switch} and \cc{dev_ram_switch} are multiplexers that
+connect either the one or the other, and they are controlled by the loader's
+output \cc{done}:
+
+\svpart{firstline=98,lastline=123}{09_ulm_on_ice/test.sv}
+
+The same signal enables the control unit (\cc{.en(loader_done)}). So the
+board is in one of two modes. As long as \cc{loader_done} is 0, the loader
+owns I/O and RAM, reads hex digits and writes the bytes to the RAM, starting
+at address 0; the control unit stands still. When the loader receives the
+character with code 4 (end of transmission, Ctrl-D), it sets \cc{done}, the
+switches flip, and the control unit starts to execute the program at
+address 0. The button \cc{BTN1} is the reset: it clears \cc{done}, so the
+loader takes over again, and puts the control unit back to its start state.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.93cm,y=0.93cm,
+    blk/.style={box,fill=blue!7,minimum height=12mm,minimum width=20mm},
+    sw/.style={box,fill=black!5,minimum width=10mm,minimum height=32mm}]
+  \node[blk] (io) at (0,0) {\cc{dev_io}\\[2pt]\footnotesize UART,\\\footnotesize 2 FIFOs};
+  \node[sw] (iosw) at (2.5,0) {\rotatebox{90}{\cc{dev_io_switch}}};
+  \node[blk] (ld) at (6.1,1.6) {\cc{dev_loader}};
+  \node[box,fill=green!8,minimum width=38mm,minimum height=24mm] (cu) at (6.1,-1.6) {};
+  \node[font=\small,anchor=north] at (cu.north) {\cc{dev_cu}};
+  \node[box,fill=white,font=\footnotesize] at (5.0,-1.85) {state\\machine,\\\cc{cu_ip}};
+  \node[box,fill=white,font=\footnotesize] at (7.25,-1.85) {\cc{dev_decoder}};
+  \node[sw] (ramsw) at (9.7,0) {\rotatebox{90}{\cc{dev_ram_switch}}};
+  \node[blk] (ram) at (12.1,0) {\cc{dev_ram}\\[2pt]\footnotesize 4 SPRAMs,\\\footnotesize 128\,KiB};
+  \node[blk] (alu) at (4.9,-4.4) {\cc{dev_alu}\\[1pt]\footnotesize + DSP};
+  \node[blk] (rf) at (7.4,-4.4) {\cc{dev_reg_file}\\[1pt]\footnotesize 8 block RAMs};
+  % pins
+  \draw[arrow] (-1.9,0.3) node[left,font=\small] {\cc{RX}} -- (io.west |- 0,0.3);
+  \draw[arrow] (io.west |- 0,-0.3) -- (-1.9,-0.3) node[left,font=\small] {\cc{TX}};
+  % connections
+  \draw[biarrow] (io) -- (iosw);
+  \draw[biarrow] (iosw.east |- ld) -- node[above,note] {\cc{io_loader}} (ld);
+  \draw[biarrow] (iosw.east |- 0,-1.2) -- node[above,note] {\cc{io_cpu}} (cu.west |- 0,-1.2);
+  \draw[biarrow] (ld) -- node[above,note] {\cc{ram_loader}} (ramsw.west |- ld);
+  \draw[biarrow] (cu.east |- 0,-1.2) -- node[above,note] {\cc{ram_cpu}} (ramsw.west |- 0,-1.2);
+  \draw[biarrow] (ramsw) -- (ram);
+  \draw[biarrow] (alu.north) -- (alu.north |- cu.south);
+  \draw[biarrow] (rf.north) -- (rf.north |- cu.south);
+  % select
+  \draw[arrow,dashed,draw=red!60!black] (ld.north) -- ++(0,0.5) -| node[pos=0.25,above,note] {\cc{loader_done}: select, and \cc{en} of \cc{dev_cu}} (ramsw.north);
+  \draw[arrow,dashed,draw=red!60!black] (ld.north) ++(0,0.5) -| (iosw.north);
+  % display
+  \node[note,anchor=north,text width=36mm] at (11.4,-2.4)
+    {hex display: the byte being loaded, later the exit code. LEDs: input buffer empty/full, loader done, CPU halted.};
+\end{tikzpicture}
+\caption{The ULM on the FPGA. The loader and the control unit share the I/O
+and the RAM through two switches; \cc{loader_done} decides who is
+connected. The ALU and the register file are separate modules, used only by
+the control unit.}
+\label{fig:step09-blocks}
+\end{figure}
+
+The arrows in Figure~\ref{fig:step09-blocks} are interfaces with modports, as
+in Chapter~\ref{ch:step07}: \cc{if_io}, \cc{if_ram}, and two new ones for the
+ALU and the register file. Look at \cc{if_reg_file.sv}: the register file has
+one write port (\cc{addr_in}, \cc{data_in}, and \cc{op} to say whether to
+write) and two read ports (\cc{addr_out0}, \cc{data_out0} and
+\cc{addr_out1}, \cc{data_out1}), because an instruction like \texttt{addq
+\%x, \%y, \%z} needs two registers at the same time. The ALU's interface
+\cc{if_alu.sv} has the operation \cc{op}, the operands \cc{a} and \cc{b}, the
+result \cc{s} and the four flags. The packages \cc{pkg_alu}, \cc{pkg_bus},
+\cc{pkg_cu}, \cc{pkg_io} and \cc{pkg_reg} contain the \cc{enum} types for the
+operations of each unit, and \cc{pkg_reg} also the sizes:
+
+\svpart{firstline=4,lastline=17}{09_ulm_on_ice/pkg_reg.sv}
+
+This is the trick of \cc{pkg_ram} from Chapter~\ref{ch:step07} again: an
+\cc{enum} with chosen values, used as a set of named constants.
+
+\section{The Register File and the ALU}
+\label{sec:step09-rf-alu}
+
+The register file is an array of sixteen 64-bit words with synchronous reads:
+
+\svfile{09_ulm_on_ice/dev_reg_file.sv}
+
+As in Chapter~\ref{ch:step07}, a memory array that is read inside a clocked
+block becomes block RAM. A block RAM of the iCE40 (\cc{SB_RAM40_4K}) has one
+read port and one write port and is at most 16 bits wide. So yosys needs four
+of them side by side for 64 bits, and, since we have two read ports, a second
+set of four that holds a copy of the same data: both copies are written
+together, each is read through its own port. That makes eight of the 30 block
+RAMs, of which we use only 16 of 256 entries. \cc{mem[0]} starts as 0, and
+writes to address 0 are suppressed, so address 0 always holds 0: that is how
+\reg{0} is always 0. The attribute \cc{(* no_rw_check *)} is explained in
+Section~\ref{sec:step09-resources}.
+
+The ALU computes all operations in combinational logic, with 64 bits, and
+selects one of them by \cc{op}. Unlike the Mini-ALU of
+Chapter~\ref{ch:step05}, which uses one adder for addition and subtraction (for a
+subtraction it inverts the second operand with $\xor\,\mathit{sub}$ and adds
+the carry-in $\mathit{sub}$), it has a separate adder and subtractor:
+
+\svfile{09_ulm_on_ice/dev_alu.sv}
+
+New is the register \cc{acc}. When \cc{op} is not \cc{ALU_NOP}, it takes over
+the result at the clock edge, and the flags \cc{cf_acc}, \cc{of_acc} and
+\cc{sf_acc} take over theirs. When \cc{op} is \cc{ALU_NOP}, the output
+\cc{alu.s} is \cc{acc}. So the ALU remembers its last result, and the zero
+flag \cc{alu.zf}, which is computed from \cc{alu.s}, belongs to it. This is
+exactly what the conditional jumps need: they look at the flags of the last
+ALU instruction. The product for \cc{mulw} uses only the lowest 16 bits of
+each operand. yosys maps it to one of the eight \term{DSP blocks} of the
+iCE40UP5K (\cc{SB_MAC16}), a ready-made $16\times16$-bit multiplier, so the
+multiplication costs no logic cells at all. The netlist shows it as
+\cc{dev_alu0.prod_SB_MAC16}.
+
+\section{The Decoder}
+\label{sec:step09-decoder}
+
+The decoder in \cc{dev_decoder.sv} takes the instruction word \cc{ir} and
+splits it into four groups of signals, one for each unit that may be
+involved: \cc{instr_alu}, \cc{instr_bus} (RAM access), \cc{instr_cu} (halt and
+jumps), and \cc{instr_io}. Each group is an interface; this is the one for the
+ALU:
+
+\svpart{firstline=9,lastline=24}{09_ulm_on_ice/if_instr_alu.sv}
+
+Here is how the decoder fills it:
+
+\svpart{firstline=144,lastline=194}{09_ulm_on_ice/dev_decoder.sv}
+
+Read it as a circuit. The \cc{always_comb} block is the actual decoder: for
+the opcode \cc{op = ir[31:24]}, a \cc{case} computes the wires of
+\cc{instr_alu_next}, with defaults for all opcodes that are not ALU
+instructions (\cc{ALU_NOP}). The register numbers are simply cut out of the
+fixed positions of the formats, \cc{ir[23:20]} for $z$, \cc{ir[19:16]} for $y$,
+\cc{ir[15:12]} for $x$, whether the instruction uses them or not. The
+\cc{always_ff} block is a register for the decoded instruction: when \cc{en}
+is 1, it takes over the wires of \cc{instr_alu_next}. The other three groups
+are built in the same way. For \cc{loadz} the decoder plays a small trick: it
+turns the instruction into an addition $\%\mathit{dest} \gets
+\mathit{imm} + \%0$, so the ALU needs no separate ``load'' operation.
+
+Note how the interfaces are used here. \cc{if_instr_alu instr_alu_next();}
+creates an interface inside the module, not as a port, only to have a name for
+a bundle of wires: \cc{instr_alu_next.op}, \cc{instr_alu_next.s_reg}, \dots{}
+In other SystemVerilog code you will often see a \cc{struct} for this purpose:
+\begin{lstlisting}
+typedef struct packed {
+    pkg_alu::op_t op;
+    logic [3:0]   s_reg, b_reg, a_reg;
+    ...
+} instr_alu_t;
+\end{lstlisting}
+A packed struct is a vector whose bits have names, so a single assignment can
+copy all fields at once (\cc{instr_alu <= instr_alu_next;}). The ULM does not
+use structs; the interfaces do the same job, at the price of copying the
+fields one by one.
+
+The conditional jumps are decided in the decoder too: for \texttt{jz}, the
+decoder sets \cc{instr_cu_next.op} to \cc{CU_REL_JMP} if \cc{alu.zf} is 1 and
+to \cc{CU_NOP} otherwise. This is why the decoder is connected to the ALU.
+
+\section{The Control Unit}
+\label{sec:step09-cu}
+
+The control unit \cc{dev_cu} is a state machine (Chapter~\ref{ch:step06}).
+Its states are in \cc{pkg_cu}:
+
+\svpart{firstline=14,lastline=21}{09_ulm_on_ice/pkg_cu.sv}
+
+and its next-state logic is short:
+
+\svpart{firstline=38,lastline=88}{09_ulm_on_ice/dev_cu.sv}
+
+Every instruction takes the same five states, FETCH, DECODE,
+LOAD\_OPERANDS, EXECUTE, INCREMENT, one clock cycle each
+(Figure~\ref{fig:step09-states}). There are three exceptions. In EXECUTE, a
+\texttt{getc} waits until the input buffer has a character
+(\cc{io.getc_en}), and a \texttt{putc} waits until \cc{dev_io} has taken
+the character (\cc{io.putc_push_done}, see below). And a \texttt{halt} is
+noticed only in the FETCH state after it, when the decoded \cc{instr_cu.op}
+is a halt; then the machine goes to HALTED and stays there until reset. As long as \cc{en} (that is,
+\cc{loader_done}) is 0, the state register keeps its value.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.93cm,y=0.93cm,
+    st/.style={draw,rounded corners=6pt,fill=green!8,minimum height=10mm,minimum width=20mm,font=\small,align=center,inner sep=3pt}]
+  \node[st] (f) at (0,0) {FETCH};
+  \node[st] (d) at (3.0,0) {DECODE};
+  \node[st] (l) at (6.0,0) {LOAD\_\\OPERANDS};
+  \node[st] (e) at (9.0,0) {EXECUTE};
+  \node[st] (i) at (12.0,0) {INCREMENT};
+  \node[st,fill=red!8] (h) at (0,-3.0) {HALTED};
+  \draw[arrow] (f) -- (d);
+  \draw[arrow] (d) -- (l);
+  \draw[arrow] (l) -- (e);
+  \draw[arrow] (e) -- (i);
+  \draw[arrow] (i.north) -- ++(0,2.0) -| node[pos=0.25,above,note] {always} (f.north);
+  \draw[arrow] (f.west) -- ++(-0.4,0) |- node[pos=0.25,left,note] {after\\a halt} (h.west);
+  \draw[arrow] ([xshift=-4mm]e.north) .. controls +(-0.3,0.9) and +(0.3,0.9) .. node[above,note,align=center] {\texttt{getc}: no character,\\\texttt{putc}: not taken} ([xshift=4mm]e.north);
+  \foreach \x/\t in {0/{RAM address $\gets$ \cc{cu_ip}},
+                     3.0/{\cc{cu_ir} from RAM; decoder registers load},
+                     6.0/{register file reads operands},
+                     9.0/{ALU computes, RAM access starts, or \texttt{putc} sends},
+                     12.0/{write result register (if any), update \cc{cu_ip}, \texttt{getc} pops}}
+    \node[note,text width=25mm,anchor=north] at (\x,-0.8) {\t};
+\end{tikzpicture}
+\caption{The state machine of the control unit, with what happens in each
+state. Each state lasts one clock cycle, except EXECUTE while \texttt{getc} or
+\texttt{putc} waits.}
+\label{fig:step09-states}
+\end{figure}
+
+Why five cycles? Because every memory in the ULM is synchronous: the SPRAM
+and the block RAMs take an address at one clock edge and deliver the data
+after it. So the instruction, fetched with the address \cc{cu_ip} in FETCH, is
+only available in DECODE; the decoded register numbers, latched at the end of
+DECODE, can only then be sent to the register file, whose data appear after
+LOAD\_OPERANDS; the ALU's result is caught in \cc{acc} at the end of EXECUTE,
+and written back in INCREMENT.
+
+The rest of \cc{dev_cu.sv} is combinational logic that says, for each state
+and each kind of instruction, what goes to the RAM, the register file, the
+ALU and the I/O. Instructions and data are in the same RAM. A second
+\cc{dev_ram_switch}, inside the control unit, gives the RAM to the instruction
+fetch in FETCH and DECODE, and to the data access in all other states:
+
+\svpart{firstline=93,lastline=122}{09_ulm_on_ice/dev_cu.sv}
+
+So the very switch that separates loader and CPU is used once more, a nice
+example of a module as a reusable circuit. The instruction is fetched as a
+\cc{RAM_LONG}, four bytes.
+
+The register file is controlled like this:
+
+\svpart{firstline=216,lastline=251}{09_ulm_on_ice/dev_cu.sv}
+
+This is a multiplexer for the addresses and the write data of the register
+file. Its defaults are those of an ALU instruction: read registers \cc{a_reg}
+and \cc{b_reg}, write the ALU output \cc{alu.s} to \cc{s_reg}. The
+\cc{if}-chain after it replaces them for the instructions that need something
+else (the listing shows two of them; further down follow \texttt{halt \%x},
+\texttt{jmp \%y, \%x}, and the loads and stores). The register file writes in
+the INCREMENT state, and only for an instruction that has a result register:
+\cc{writes_reg} is 1 for the ALU instructions, \texttt{getc}, \texttt{jmp \%y,
+\%x} (which saves the return address in $\%x$) and the loads. This condition
+matters. The register numbers are cut out of the instruction word whether the
+instruction uses them or not, so for \texttt{putc 'A'} (\texttt{0x31410000})
+\cc{s_reg} is 4, and for \texttt{jmp fetch} (\texttt{0x05FFFFFB}) it is 15.
+Without \cc{writes_reg}, these instructions would write the ALU's last result
+into \reg{4} and \reg{15} (Exercise~\ref{ex:step09-putc}).
+
+The ALU gets its operands from the register file or, for an immediate
+operand, from the decoded instruction, and it operates only in EXECUTE; in
+all other states it gets \cc{ALU_NOP} and keeps \cc{acc}:
+
+\svpart{firstline=288,lastline=303}{09_ulm_on_ice/dev_cu.sv}
+
+The I/O instructions are controlled by this block:
+
+\svpart{firstline=187,lastline=214}{09_ulm_on_ice/dev_cu.sv}
+
+\texttt{getc} takes its character from the input buffer in INCREMENT, after
+EXECUTE has waited for \cc{io.getc_en}. \texttt{putc} offers its character
+in EXECUTE (\cc{io.putc_push}), and the state machine stays in EXECUTE until
+\cc{dev_io} answers with \cc{io.putc_push_done} (Chapter~\ref{ch:step07}).
+\cc{dev_io} does not always take the character at once: not while the output
+buffer is full, and not in a cycle in which it pushes the echo of a received
+byte. In that case \cc{putc_push_done} stays 0, and the control unit simply
+offers the character again in the next cycle. When \cc{dev_io} takes it, it
+sets \cc{putc_push_done} for one cycle; in that cycle \cc{putc_push} is still
+1, but \cc{dev_io} is busy with its own push and ignores it, so each character
+goes into the buffer exactly once. Without this handshake, a program that
+sends more than the 512 bytes the output buffer holds would lose characters.
+
+The instruction pointer \cc{cu_ip} is a 17-bit register (the RAM has
+$2^{17}$ bytes). In INCREMENT it becomes $\mathit{ip}+4$, or $\mathit{ip} +
+4\cdot\mathit{offset}$ for a jump that is taken (the decoder already appended
+two zero bits to the offset), or the content of a register for \texttt{jmp
+\%y, \%x}. All of this is computed modulo $2^{17}$, so a negative offset in
+two's complement simply works.
+
+\section{One Instruction, Cycle by Cycle}
+\label{sec:step09-cycles}
+
+Let us follow the instruction \texttt{addq 1, \%p, \%p} of \cc{01_hello.s}
+(below) through the hardware. Here \reg{p} is \reg{1}, the instruction is at
+address \texttt{0x08}, its code is \texttt{0x12110001} (opcode \texttt{12},
+$z=1$, $y=1$, $\mathit{imm}=1$), and \reg{1} contains \texttt{0x20}. The values
+in Table~\ref{tab:step09-addq} are taken from a simulation of this program
+(Section~\ref{sec:step09-run}).
+
+\begin{table}[ht]
+\centering
+\small
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{68mm} >{\raggedright\arraybackslash}p{44mm}@{}}
+\toprule
+state & during the cycle & at the rising edge at its end \\
+\midrule
+FETCH & RAM switch to instruction fetch; RAM address \cc{cu_ip} $=$ \texttt{0x08},
+  \cc{RAM_FETCH} & SPRAM takes over the address \\ \addlinespace
+DECODE & \cc{cu_ir} $=$ \texttt{0x12110001}; the decoder computes \cc{ALU_ADD},
+  \cc{ALU_IMM}, \cc{s_reg} $=1$, \cc{b_reg} $=1$, \cc{a_imm} $=1$;
+  \cc{decoder_en} $=1$ & \cc{instr_alu} takes over these values \\ \addlinespace
+LOAD\_OPS & register file: \cc{addr_out1} $=$ \cc{b_reg} $=1$; \cc{alu.a} $=$
+  \cc{a_imm} $=1$ & \cc{data_out1} $\gets \%1 =$ \texttt{0x20} \\ \addlinespace
+EXECUTE & \cc{alu.op} $=$ \cc{ALU_ADD}, \cc{alu.b} $=$ \texttt{0x20},
+  \cc{alu.s} $=$ \texttt{0x21}, ZF $=0$ & \cc{acc} $\gets$ \texttt{0x21} \\ \addlinespace
+INCREMENT & \cc{alu.op} $=$ \cc{ALU_NOP}, so \cc{alu.s} $=$ \cc{acc} $=$
+  \texttt{0x21}; register file: \cc{op} $=$ \cc{REG_WRITE}, \cc{addr_in} $=1$,
+  \cc{data_in} $=$ \texttt{0x21}; \cc{cu_ip_next} $=$ \texttt{0x0c}
+  & $\%1 \gets$ \texttt{0x21}, \cc{cu_ip} $\gets$ \texttt{0x0c}, next state
+  FETCH \\
+\bottomrule
+\end{tabular}
+\caption{\texttt{addq 1, \%p, \%p} in five clock cycles.}
+\label{tab:step09-addq}
+\end{table}
+
+The load \texttt{movzbq (\%p), \%ch} before it, at address \texttt{0x04},
+takes the same five states but uses other paths. In LOAD\_OPERANDS the
+register file reads \reg{1} on port 0 (the address register). In EXECUTE the
+RAM switch of the control unit has changed sides, and the data access sends
+the address $\%1 + \mathit{offset} = $ \texttt{0x20} with \cc{RAM_FETCH} and
+\cc{RAM_BYTE} to the RAM. In INCREMENT the RAM delivers the byte
+\texttt{0x68} (an \texttt{h}), zero-extended to 64 bits by the byte logic of
+Chapter~\ref{ch:step08}, and the register file writes it to \reg{2}. For
+\texttt{movsbq} the decoder sets an additional signal \cc{instr_bus.sign_ext},
+and the control unit replaces bits 63 to 8 of the byte by copies of its bit 7
+before it goes to the register file.
+
+At 12\,MHz and five cycles per instruction the ULM executes 2.4 million
+instructions per second.
+
+\begin{exercise}
+\label{ex:step09-encode}
+(a) The word \texttt{0x05FFFFFB} is at address \texttt{0x18} of
+\cc{examples/01_hello}. Which instruction is it, and where does it jump? (b)
+Encode \texttt{subq \%3, \%4, \%5}. Which register gets which difference?
+\end{exercise}
+
+\section{Running a Program}
+\label{sec:step09-run}
+
+This is the first example program:
+
+\verbfile{examples/01_hello.s}
+
+Line 5 puts a string of 65 bytes and a terminating zero byte into the data
+segment: UTF-8 encodes the beer mug emoji in four bytes and each Chinese
+character in three, and \texttt{\textbackslash n} is the newline character. The program sets
+\reg{p} to the address of the string, loads one byte after another, and sends
+it with \texttt{putc}, until it finds the terminating zero byte. The
+comparison with zero is a subtraction whose result goes to \reg{0}: the result
+itself is thrown away, but the zero flag remains. Assembled, the program is
+this sequence of hex digits, \cc{examples/01_hello}:
+
+\begin{terminal}
+10100020202100001211000114020000040000033020000005FFFFFB0142000068656C6C6F
+2C20776F726C642120F09F8DBA200AE4BDA0E5A5BDE4B896E7958C0A48616C6C6F2C205765
+6C740A4772C3BCC39F652061757320556C6D203B2D290A00
+\end{terminal}
+
+(the file is one line; we broke it here). The first eight words are the
+instructions; from address \texttt{0x20} on follows the string, byte by byte.
+UTF-8 needs several bytes for the emoji and for the Chinese characters, and
+the ULM does not care: it sends bytes, and the terminal puts them together.
+
+\subsection*{On the board}
+
+\begin{enumerate}
+\item In \cc{09_ulm_on_ice}, \cc{make prog} writes the ULM to the board.
+\item Start a serial terminal, for instance \cc{06_io_mirror/kermit-serial}
+  (Chapter~\ref{ch:step06}; adjust the device in \cc{set line}). It talks at
+  9600 baud.
+\item Paste the contents of \cc{examples/01_hello} into the terminal. Each
+  character comes back as an echo, since \cc{dev_io} copies every received
+  byte to the output (Chapter~\ref{ch:step07}). The loader turns pairs of hex
+  digits into bytes and ignores everything that is not a hex digit, such as
+  line breaks. Meanwhile the display shows the byte being assembled.
+\item Press Ctrl-D. This sends the byte 4; the loader sets \cc{done}, LED3
+  goes on, the display goes dark, and the ULM runs. The text appears in the
+  terminal, then the ULM halts: LED4 goes on, and the display shows the exit
+  code \texttt{42} of \texttt{halt 0x42}.
+\item To run the next program, press \cc{BTN1} and start again with step 3.
+  The registers and the RAM are not cleared, the new program simply overwrites
+  the old one from address 0 on.
+\end{enumerate}
+
+The other examples read numbers with \texttt{getc} and print results:
+\cc{02_uint64_hex_io} works with hexadecimal numbers, \cc{03_uint64_dec_io}
+with decimal ones, and \cc{04_factorial} computes factorials. Their source files
+show how the ULM calls functions with \texttt{jmp \%y, \%x} and a stack in the
+RAM.
+
+\begin{pitfall}
+A first version of \cc{test.sv} declared the reset as \cc{logic rst = BTN1;}.
+In SystemVerilog this is a declaration with an \emph{initial value}, not an
+\cc{assign}: the variable gets the value of \cc{BTN1} once, at time 0. yosys
+turned it into a connection to \cc{BTN1}, so the button worked on the board;
+Verilator follows the standard, so in the simulation \cc{rst} never changed.
+(We checked both with a two-line module.) If a signal is meant to follow
+another one, write \cc{logic rst;} and \cc{assign rst = BTN1;}, as
+\cc{test.sv} does now. The testbench below relies on it: it presses
+\cc{BTN1} before each program.
+\end{pitfall}
+
+\subsection*{In the simulation}
+
+\cc{make sim} works as in all earlier steps. The testbench \cc{tb_test.cpp}
+does not go through the serial line: at 9600 baud a byte takes $12\cdot10^6
+\cdot 11 / 9600 = 13\,750$ clock cycles, far too many for a simulation.
+Instead it plays the role of the UART receiver (Chapter~\ref{ch:step06})
+itself, in the function that simulates one clock cycle:
+
+\cpppart{firstline=39,lastline=70}{09_ulm_on_ice/tb_test.cpp}
+
+Every fourth clock cycle it sets the outputs \cc{rx_ready} and \cc{rx_data}
+of \cc{uart_rx0}, as if a byte had just arrived. Verilator makes this
+possible: the C++ class of the design has members for the submodules, and the
+testbench may overwrite their signals. In the other direction, the testbench
+reads four signals of \cc{test.sv} that are marked with the comment
+\cc{/* verilator public */}: \cc{cpu_halted}, \cc{cpu_exit_code}, and
+\cc{cpu_putc_done} and \cc{cpu_putc_char}, which are \cc{putc_push_done} and
+\cc{putc_char} of the CPU's I/O interface. Whenever \cc{cpu_putc_done} is 1,
+\cc{dev_io} has just taken a character from a \texttt{putc}, and the
+testbench appends it to \cc{output}. This is much faster than decoding the
+serial signal on \cc{TX}.
+
+The function \cc{run} presses \cc{BTN1} for a few cycles, sends a program as
+hex digits followed by the byte 4, waits until the loader is done
+(\cc{LED3}) and then until the CPU has halted, and compares the exit code and
+the output with the expected ones. The testbench runs four programs this way:
+\cc{examples/01_hello}, which it reads from the file, and three short
+programs that check details of the control unit: that \texttt{putc 'A'} does
+not write \reg{4}, that the backward jump \texttt{jnz} does not write
+\reg{15}, and that \texttt{movsbq} extends the sign. Only the first program
+goes into \cc{waveform.vcd}. The output, without the build steps (the lines
+of \cc{01_hello} with Chinese characters and the emoji are left out here):
+
+\outputfile{step09_make_sim.txt}
+
+The loader is done after 802 clock cycles, and the ULM then sends the 65
+bytes of the string and halts 2046 cycles later with exit code
+\texttt{0x42}. Table~\ref{tab:step09-addq} was read off this simulation.
+
+\begin{exercise}
+\label{ex:step09-cycles}
+Explain the 2046 cycles from the program and Figure~\ref{fig:step09-states}.
+How long does it take the UART to send the 65 bytes at 9600 baud, with one
+start bit, eight data bits and two stop bits each? Where do the bytes wait in
+the meantime?
+\end{exercise}
+
+\section{Resources and Speed}
+\label{sec:step09-resources}
+
+\cc{make report} (Appendix~\ref{app:tools}) for the whole ULM:
+
+\outputfile{step09_report.txt}
+
+The ULM fills 57\,\% of the logic cells, all four SPRAMs, ten of the block
+RAMs (eight for the registers, two for the FIFOs) and one DSP block. The
+per-module part of the report is of little help this time: almost all modules
+of this step have interfaces as ports, sv2v merges those into their parent,
+and so the ALU, the register file and the control unit all disappear into
+\cc{test}. The floorplan (\cc{make floorplan}) assigns logic cells to instances
+by the names of the cells, and its table gives a better picture:
+
+\outputfile{step09_floorplan.txt}
+
+\textbf{The ALU} is the largest part. To find out why, we synthesized
+\cc{dev_alu} alone, with a small wrapper module that connects its interface
+to ports: 1375 LUTs, 128 carry cells, 67 flip-flops, one DSP. Without the two
+shift operations it needs 540 LUTs. So the two 64-bit shifters cost about 835
+LUTs: a shifter that can shift by any amount from 0 to 63 is a cascade of six
+layers of 64 multiplexers (shift by 1, 2, 4, 8, 16, 32 or not), for each
+direction. The 128 carry cells are two 64-bit carry chains, one for the
+adder and one for the subtractor.
+
+\textbf{The register file} gets 339 logic cells in the floorplan, for
+something that lives in block RAMs. This is an artefact of how the floorplan
+assigns cells: yosys names a cell after a net it is connected to, and many
+LUTs of the ALU's input logic are named after the read data of the block RAMs.
+Synthesized alone, with a small wrapper module, the register file gives
+
+\outputfile{step09_rf_stat.txt}
+
+that is, the eight block RAMs and three LUTs for the write enable
+(\cc{op} is \cc{REG_WRITE} and \cc{addr_in} is not 0). Two details of
+\cc{dev_reg_file.sv} keep it this small:
+\begin{itemize}
+\item \reg{0} reads as 0 without any logic. Address 0 is never written, and
+  \cc{mem[0]} starts as 0 (the initial contents of a block RAM are part of the
+  bitstream, Chapter~\ref{ch:step07}), so both copies of the memory always
+  hold 0 there. A test like \cc{addr_out0 != 0 ? mem[...] : 0} would need a
+  multiplexer behind the block RAM, one LUT for each of the 64 bits of each
+  read port.
+\item The attribute \cc{(* no_rw_check *)} on \cc{mem} tells yosys not to
+  care about a read and a write of the same address at the same clock edge
+  (Chapter~\ref{ch:step07}). Without it, yosys delays the write by one cycle
+  (flip-flops for the 64 data bits, the address and the write enable) and adds
+  a bypass, so that a read still sees the value the description promises. In
+  the ULM, the register file is written only at the end of INCREMENT, and
+  what its read ports deliver after that edge is not used: in the next
+  instruction, the operands are read again in LOAD\_OPERANDS.
+\end{itemize}
+Exercise~\ref{ex:step09-rf} measures what each of them saves.
+
+\textbf{The clock.} nextpnr reports a maximum frequency of 15.41\,MHz,
+against the 12\,MHz of the board: the design works, with about 25\,\% of
+margin. The critical path is this one (shortened):
+
+\outputfile{step09_pnr_path.txt}
+
+It starts at the flip-flops of the decoded instruction (\cc{instr_alu.a_imm}),
+goes through the 64-bit adder of the ALU and the test whether the result is
+zero (\cc{alu.zf}), and ends at the register in the decoder that decides
+whether a conditional jump is taken (\cc{instr_cu.op}): 64.9\,ns of the
+83.3\,ns that a clock cycle at 12\,MHz has. As in step 01, most of the time is
+spent in the wires (45.0\,ns), not in the logic (19.9\,ns). Strictly speaking,
+this path is never used within one clock cycle: the ALU computes only in
+EXECUTE, and the decoder takes over its inputs only in DECODE, when the ALU
+gets \cc{ALU_NOP} and \cc{alu.zf} comes from the register \cc{acc}. nextpnr
+does not know the state machine, so it has to assume the worst case. Such a
+path is called a \term{false path}.
+
+\begin{exercise}
+\label{ex:step09-rf}
+In \cc{dev_reg_file.sv}, (1) remove \cc{(* no_rw_check *)}; (2) instead, keep
+the attribute and read with \cc{reg_file.addr_out0 != 0 ? mem[reg_file.addr_out0]
+: 0} (and the same for port 1). Predict what happens to the cell count of the
+register file and of the whole design, then check with \cc{make report}. Does
+the ULM still work (\cc{make sim})?
+\end{exercise}
+
+\begin{exercise}
+\label{ex:step09-putc}
+The testbench loads this program:
+\begin{terminal}
+10400007125400013141000002400000
+\end{terminal}
+It is \texttt{loadz 7, \%4}; \texttt{addq 1, \%4, \%5}; \texttt{putc 'A'};
+\texttt{halt \%4}, and it halts with exit code \texttt{07}. Suppose
+\cc{dev_cu.sv} wrote the register file in every INCREMENT state, that is,
+without \cc{&& writes_reg}. Which exit code would the program give? Which
+other instructions would change a register they do not name?
+\end{exercise}
+
+\section{What Could Be Improved}
+\label{sec:step09-outlook}
+
+The README of the repository calls the ULM on ICE a working prototype, written
+while its author met SystemVerilog and FPGAs for the first time. It does what
+it was built for: it runs the programs of the course. Having gone through all
+nine steps, you are now in a position to improve it. Some ideas, from small to
+large:
+
+\begin{itemize}
+\item \textbf{More instructions.} The instruction set has no \texttt{or},
+  no \texttt{not}, no arithmetic shift right, no division, and only byte and
+  quad word loads and stores. Each new instruction is an opcode in
+  \cc{dev_decoder.sv}, perhaps an operation in \cc{dev_alu.sv}, and an entry
+  in \cc{isa.txt}, so that the assembler knows it.
+\item \textbf{Fewer logic cells.} The adder and the subtractor can share one
+  carry chain, since $b - a = b + \neg a + 1$, as in the Mini-ALU of
+  Chapter~\ref{ch:step05}. The shifters could shift by one bit
+  per clock cycle, at the price of up to 63 cycles per shift. With more than
+  40\,\% of the logic cells free, there is room for more instructions, such
+  as a full 64-bit multiplication from four of the DSP blocks.
+\item \textbf{More speed.} Five cycles per instruction is slow. The next
+  instruction could be fetched while the current one is executed; this is
+  \term{pipelining}, and every modern processor does it. It needs care: a
+  jump changes which instruction comes next, and an instruction may need the
+  result of the one before. And the clock could be faster: the iCE40UP5K has a
+  PLL that can make a faster clock from the 12\,MHz, but first the critical
+  paths must become shorter, and nextpnr must be told which paths are false
+  ones, or the design must be changed so that they disappear.
+\end{itemize}
+
+We started with two buttons and an AND gate. We end with a computer that
+we can describe completely, from the lookup table to the instruction set,
+and that runs programs we write. Every step on the way was a circuit, and so
+is the ULM: registers, multiplexers, adders and memory, connected by wires.
+
+\solutions
+
+\solution
+(a) Opcode \texttt{05} is \texttt{jmp}. The 24-bit offset \texttt{0xFFFFFB}
+is $-5$ in two's complement, so the target is $\texttt{0x18} - 5\cdot 4 =
+\texttt{0x04}$, the instruction \texttt{fetch movzbq (\%p), \%ch}: this is the
+\texttt{jmp fetch} that closes the loop. In hardware, the decoder appends two
+zero bits, and \cc{dev_cu} adds the lowest 17 bits to \cc{cu_ip}: $\texttt{0x18}
++ (2^{17} - 20) \equiv \texttt{0x04} \pmod{2^{17}}$.
+
+(b) The register form of \texttt{subq} has opcode \texttt{15} and format
+\texttt{R\_R\_R} with $z = 5$, $y = 4$, $x = 3$: \texttt{0x15543000}. It
+computes $\%5 \gets \%4 - \%3$ (the ALU computes \cc{b - a} with \cc{b} from
+$y$ and \cc{a} from $x$).
+
+\solution
+The program executes \texttt{loadz} once, then for each of the 65 bytes the
+six instructions \texttt{movzbq}, \texttt{addq}, \texttt{subq}, \texttt{jz}
+(not taken), \texttt{putc}, \texttt{jmp}, then \texttt{movzbq}, \texttt{addq},
+\texttt{subq} and the taken \texttt{jz} for the zero byte, and finally
+\texttt{halt}. That is $1 + 6\cdot 65 + 4 + 1 = 396$ instructions of five
+cycles, 1980 cycles. Each \texttt{putc} stays one cycle longer in EXECUTE:
+\cc{dev_io} takes the character at the end of the first EXECUTE cycle and
+answers with \cc{putc_push_done} in the second. That adds 65 cycles, and the
+FETCH cycle in which the halt is noticed one more: 2046. That is 0.17\,ms at
+12\,MHz. The UART needs 11 bit times per byte, so $65 \cdot 11 /
+9600\,\mathrm{s} \approx 74.5$\,ms, more than 400 times as long. The bytes
+wait in the output FIFO of \cc{dev_io}, which holds 512 bytes, and the ULM has
+halted long before the terminal shows the text.
+
+\solution
+(1) Without \cc{(* no_rw_check *)}, the register file alone grows from 11 to
+284 cells: 135 flip-flops and 141 LUTs for the delayed write and the bypass
+come in addition to the block RAMs. The whole design grows from 3036 to 3228
+logic cells, and its maximum frequency drops from 15.41 to 14.18\,MHz. (2)
+With the test for address 0, the register file alone has 143 cells: the
+multiplexers behind the block RAMs. The whole design needs 3070 logic cells
+and reaches 14.98\,MHz. The saving in the whole design is smaller than in the
+register file alone because nextpnr can put a LUT and an unrelated flip-flop
+into the same logic cell. In both cases \cc{make sim} still passes all four
+programs: the extra logic does what it should, it is just not needed in the
+ULM.
+
+\solution
+Without \cc{writes_reg}, the defaults of the \cc{always_comb} block would
+apply to \texttt{putc 'A'}: write \cc{alu.s} to register
+\cc{instr_alu.s_reg}, which the decoder always cuts out of \cc{ir[23:20]}.
+\texttt{putc 'A'} is \texttt{0x31410000}, so \cc{s_reg} is 4, and the ALU's
+last result, $\mathtt{acc} = 7 + 1 = 8$, would be written to \reg{4}: exit
+code \texttt{08}. (An earlier version of \cc{dev_cu.sv} had exactly this
+mistake.) The same would happen for \texttt{halt imm} (register
+$\lfloor\mathit{imm}/16\rfloor$) and for the relative jumps, taken or not: \texttt{jmp fetch} in \cc{01_hello} is
+\texttt{0x05FFFFFB}, which would write \cc{acc} to \reg{15}, and so does every
+backward jump, since its offset is negative and starts with the bits
+\texttt{1111}. This is what the third program of the testbench checks. The
+examples would survive it, because their \texttt{putc} constants are
+\texttt{'\textbackslash n'} $=$ \texttt{0x0A}, which hits \reg{0}, and they do
+not use \reg{15}.

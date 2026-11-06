@@ -1,0 +1,1 @@
+No latch inferred for signal `\test.\rst' from process `\test.$proc$test.v:714$454'.

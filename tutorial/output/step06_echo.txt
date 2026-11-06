@@ -1,0 +1,11 @@
+$ make sim
+...
+
+### SIMULATING ###
+cycle 13757: TX = 0
+cycle 15009: TX = 1
+cycle 16260: TX = 0
+cycle 22516: TX = 1
+cycle 23768: TX = 0
+cycle 25019: TX = 1
+sent 41, received 41: PASSED

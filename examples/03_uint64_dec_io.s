@@ -17,13 +17,13 @@
         .equ    local1,     local0 - 8      # extend if more than 2 local
                                             # variables are needed
 
-	.data
-msg0:	.string "Type in some unsigned integer in decimal format\n\n"
+        .data
+msg0:   .string "Type in some unsigned integer in decimal format\n\n"
 msg1:   .string "again? (type 'n' to exit, any other key to continue)\n"
 msg2:   .string "Tschüss!\n"
 
-neq:	.string "n = "
-got:	.string "got: n = "
+neq:    .string "n = "
+got:    .string "got: n = "
 
         .text
 #
@@ -52,12 +52,12 @@ got:	.string "got: n = "
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	// local0 = getu();
+        // local0 = getu();
         subq    3 * 8,      %SP,        %SP
         loadz   getu,       %4
         call    %4,         %RET_ADDR
-	movq	rval(%SP),  %4
-	movq	%4,	    local0(%FP)
+        movq    rval(%SP),  %4
+        movq    %4,         local0(%FP)
         addq    3 * 8,      %SP,        %SP
 
         // call puts(got)
@@ -70,13 +70,13 @@ got:	.string "got: n = "
 
         // call putu(local0)
         subq    4 * 8,      %SP,        %SP
-	movq	local0(%FP),%4
+        movq    local0(%FP),%4
         movq    %4,         fparam0(%SP)
         loadz   putu,      %4
         call    %4,         %RET_ADDR
         addq    4 * 8,      %SP,        %SP
 
-	putc	'\n'
+        putc    '\n'
 
         // call puts(msg1)
         subq    4 * 8,      %SP,        %SP
@@ -90,7 +90,7 @@ got:	.string "got: n = "
         subq    'n',        %4,         %0
         jnz     .loop
 
-	// call puts(msg2)
+        // call puts(msg2)
         subq    4 * 8,      %SP,        %SP
         loadz   msg2,        %4
         movq    %4,         fparam0(%SP)
@@ -101,7 +101,7 @@ got:	.string "got: n = "
 
 
 
-	halt	0
+        halt    0
 
 /*
         uint64_t getu
@@ -112,48 +112,48 @@ getu:
         movq    %FP,        fp(%SP)
         movq    %SP,        %FP
 
-	// reserve space for 2 local variables 'local0', 'local1'.
+        // reserve space for 2 local variables 'local0', 'local1'.
         subq    2 * 8,      %SP,        %SP
 
         /* begin of the function body */
-	// local0 = 0;
-	loadz	0,	    %4
-	movq	%4,	    local0(%FP)
+        // local0 = 0;
+        loadz   0,          %4
+        movq    %4,         local0(%FP)
 
 .loop.getu:
-	getc	%4
-	subq	'0',	    %4,		%0
-	jb	.done.getu
-	subq	'9',	    %4,		%0
-	ja	.done.getu
+        getc    %4
+        subq    '0',        %4,         %0
+        jb      .done.getu
+        subq    '9',        %4,         %0
+        ja      .done.getu
 
-	// local1 = %5 - '0';
-	subq	'0',	    %4,		%4
-	movq	%4,	    local1(%FP)
+        // local1 = %5 - '0';
+        subq    '0',        %4,         %4
+        movq    %4,         local1(%FP)
 
-	// local0 *= 10;
+        // local0 *= 10;
         subq    5 * 8,      %SP,        %SP
         movq    local0(%FP),%4
         movq    %4,         fparam0(%SP)
-	loadz	10,	    %4
-	movq	%4,	    fparam1(%SP)
+        loadz   10,         %4
+        movq    %4,         fparam1(%SP)
         loadz   imulq,      %4
         call    %4,         %RET_ADDR
-	movq	rval(%SP),  %4
-	movq	%4,	    local0(%FP)
+        movq    rval(%SP),  %4
+        movq    %4,         local0(%FP)
         addq    5 * 8,      %SP,        %SP
 
-	// local0 += local1
-	movq	local0(%FP),%4
-	movq	local1(%FP),%5
-	addq	%4,	    %5,		%4
-	movq	%4,	    local0(%FP)
+        // local0 += local1
+        movq    local0(%FP),%4
+        movq    local1(%FP),%5
+        addq    %4,         %5,         %4
+        movq    %4,         local0(%FP)
 
-	jmp	.loop.getu
+        jmp     .loop.getu
 
 .done.getu
-	movq	local0(%FP),%4
-	movq	%4,	    rval(%FP)
+        movq    local0(%FP),%4
+        movq    %4,         rval(%FP)
 
         /* end of the function body */
 
@@ -172,7 +172,7 @@ putu:
         movq    %FP,        fp(%SP)
         movq    %SP,        %FP
 
-	// reserve space for 1 local variable 'local0'.
+        // reserve space for 1 local variable 'local0'.
         subq    1 * 8,      %SP,        %SP
 
         /* begin of the function body */
@@ -228,51 +228,51 @@ div10:
         movq    %SP,        %FP
 
         /* begin of the function body */
-	.equ    N,	    4
-    	.equ    Q,	    5
-    	.equ    R,	    6
-    	.equ    TMP,	    6
+        .equ    N,          4
+        .equ    Q,          5
+        .equ    R,          6
+        .equ    TMP,        6
 
-	movq	fparam0(%FP),%N
+        movq    fparam0(%FP),%N
 
-    	// q = (n >> 1) + (n >> 2);
-    	shrq    1,	    %N,		%Q
-    	shrq    2,	    %N,		%TMP
-    	addq    %Q,	    %TMP,	%Q
+        // q = (n >> 1) + (n >> 2);
+        shrq    1,          %N,         %Q
+        shrq    2,          %N,         %TMP
+        addq    %Q,         %TMP,       %Q
 
-    	// q = q + (q >> 4);
-    	shrq    4,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
+        // q = q + (q >> 4);
+        shrq    4,          %Q,         %TMP
+        addq    %Q,         %TMP,       %Q
 
-    	// q = q + (q >> 8);
-    	shrq    8,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
+        // q = q + (q >> 8);
+        shrq    8,          %Q,         %TMP
+        addq    %Q,         %TMP,       %Q
 
-    	// q = q + (q >> 16);
-    	shrq    16,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
+        // q = q + (q >> 16);
+        shrq    16,         %Q,         %TMP
+        addq    %Q,         %TMP,       %Q
 
-    	// q = q + (q >> 32);
-    	shrq    32,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%Q
+        // q = q + (q >> 32);
+        shrq    32,         %Q,         %TMP
+        addq    %Q,         %TMP,       %Q
 
-    	// q = q >> 3;
-    	shrq    3,	    %Q,		%Q
+        // q = q >> 3;
+        shrq    3,          %Q,         %Q
 
-    	// r = n - (((q << 2) + q) << 1);
-    	shlq    2,	    %Q,		%TMP
-    	addq    %Q,	    %TMP,	%TMP
-    	shlq    1,	    %TMP,	%TMP
-    	subq    %TMP,	    %N,		%R
+        // r = n - (((q << 2) + q) << 1);
+        shlq    2,          %Q,         %TMP
+        addq    %Q,         %TMP,       %TMP
+        shlq    1,          %TMP,       %TMP
+        subq    %TMP,       %N,         %R
 
-    	subq    9,	    %R,		%0
-    	jbe	.done
-    	addq    1,	    %Q,		%Q
-    	subq    10,	    %R,		%R
+        subq    9,          %R,         %0
+        jbe     .done
+        addq    1,          %Q,         %Q
+        subq    10,         %R,         %R
 .done:
 
-	movq	%Q,	    fparam0(%FP)
-	movq	%R,	    fparam1(%FP)
+        movq    %Q,         fparam0(%FP)
+        movq    %R,         fparam1(%FP)
 
         /* end of the function body */
 

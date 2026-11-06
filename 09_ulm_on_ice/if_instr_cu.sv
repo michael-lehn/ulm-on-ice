@@ -11,20 +11,20 @@ interface if_instr_cu;
 
     // decoder is client
     modport client (
-	output op,
-	output exit_code_imm,
-	output cu_reg0,
-	output cu_reg1,
-	output jmp_offset
+        output op,
+        output exit_code_imm,
+        output cu_reg0,
+        output cu_reg1,
+        output jmp_offset
     );
 
     // control unit is server
     modport server (
-	input op,
-	input exit_code_imm,
-	input cu_reg0,
-	input cu_reg1,
-	input jmp_offset
+        input op,
+        input exit_code_imm,
+        input cu_reg0,
+        input cu_reg1,
+        input jmp_offset
     );
 
 endinterface
