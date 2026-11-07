@@ -9,6 +9,15 @@ next semester.
 It is a simple implementation of the ULM (Ulm Lecture Machine) on a
 [iCEBreaker FPGA](https://1bitsquared.com/products/icebreaker).
 
+## Tutorial
+
+The directory `tutorial/` contains lecture notes that introduce everything
+step by step: what an FPGA is, SystemVerilog as a textual representation of
+circuits, the tools (`sv2v`, `yosys`, `nextpnr`, `icestorm`, Verilator), and
+then one chapter per step directory up to the ULM. Read it as
+[PDF](tutorial/ulm-on-ice-tutorial.pdf); to rebuild it from the LaTeX sources,
+run `make` in `tutorial/` (LuaLaTeX).
+
 ## Current state
 
 It's a working prototype, and it's is doing what it was designed for. When I
@@ -69,11 +78,4 @@ Optional:
 - For the tutorial PDF: a TeX distribution with `lualatex`
   (`brew install texlive` or MacTeX).
 
-## Tutorial
 
-The directory `tutorial/` contains lecture notes that introduce everything
-step by step: what an FPGA is, SystemVerilog as a textual representation of
-circuits, the tools (`sv2v`, `yosys`, `nextpnr`, `icestorm`, Verilator), and
-then one chapter per step directory up to the ULM. Read it as
-[PDF](tutorial/ulm-on-ice-tutorial.pdf); to rebuild it from the LaTeX sources,
-run `make` in `tutorial/` (LuaLaTeX).
